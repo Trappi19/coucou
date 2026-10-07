@@ -166,11 +166,40 @@ function typingDots(label: string | null): HTMLElement {
   );
 }
 
-/** The coloured chip showing what the question is about (a dropped file). */
-function contextChip(label: string): HTMLElement {
+/**
+ * The coloured chip showing what the question is about (a dropped file).
+ * `onRemove` adds the × — only offered while the file hasn't gone out yet.
+ */
+function contextChip(label: string, onRemove: (() => void) | null): HTMLElement {
   const chip = h("div", { class: "chip" }, h("i", { class: "chip-dot" }), h("span", { text: label }));
+  if (onRemove) {
+    chip.title = "Sent to Claude with your first message";
+    chip.append(
+      h(
+        "button",
+        { class: "chip-x", title: "Leave this file out", onclick: () => onRemove() },
+        svg(ICONS.xmark, 7),
+      ),
+    );
+  } else {
+    chip.title = "Claude has this file in this conversation. Start a new one to leave it out.";
+  }
   requestAnimationFrame(() => chip.classList.add("settled"));
   return chip;
+}
+
+/** A fresh conversation about a dropped file: the file stays, everything else goes. */
+export async function newConversationAbout(file: { name: string; path: string }): Promise<void> {
+  // An answer still coming in belongs to the old conversation: stop it first.
+  if (State.chatPending) {
+    await Bridge.chatCancel();
+    for (let i = 0; i < 50 && State.chatPending; i++) await new Promise((r) => setTimeout(r, 100));
+  }
+  await newConversation();
+  State.chatDraft = "";
+  State.droppedFile = file;
+  State.promptContext = { kind: "file", name: file.name, path: file.path };
+  State.notify();
 }
 
 /** Project dot: Mochi's rainbow for Discussion, the project colour otherwise. */
@@ -369,12 +398,24 @@ export function buildPrompt(actions: ViewActions, onHeightChange: () => void): V
         State.chatTitle ?? (State.chatHistory.length === 0 ? "New conversation" : "");
       newBtn.disabled = State.chatPending;
 
+      // The file goes out with the first message only: until then it can be left out.
       const file = State.droppedFile;
-      const wantChip = file?.name ?? "";
+      const removable = file != null && !State.chatHistory.some((m) => m.role === "user");
+      const wantChip = file ? `${file.name}|${removable}` : "";
       if (chipRow.dataset.label !== wantChip) {
         chipRow.dataset.label = wantChip;
         clear(chipRow);
-        if (wantChip) chipRow.append(contextChip(wantChip));
+        if (file) {
+          chipRow.append(
+            contextChip(file.name, removable ? () => {
+              actions.blip();
+              State.droppedFile = null;
+              State.promptContext = null;
+              State.notify();
+              input.focus();
+            } : null),
+          );
+        }
       }
 
       const pending = State.chatPending;

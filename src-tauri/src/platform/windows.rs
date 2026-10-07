@@ -85,6 +85,42 @@ pub fn reveal_folder(path: &str) {
     let _ = Command::new("explorer").arg(path).spawn();
 }
 
+/// Sends files and folders to the Recycle Bin, where they can be restored.
+pub fn move_to_trash(paths: &[PathBuf]) -> Result<(), String> {
+    use ::windows::core::PCWSTR;
+    use ::windows::Win32::UI::Shell::{
+        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FO_DELETE,
+        SHFILEOPSTRUCTW,
+    };
+    use std::os::windows::ffi::OsStrExt;
+
+    if paths.is_empty() {
+        return Ok(());
+    }
+    // One string holding every path, each ended by a NUL, the list by another.
+    let mut from: Vec<u16> = Vec::new();
+    for path in paths {
+        from.extend(path.as_os_str().encode_wide());
+        from.push(0);
+    }
+    from.push(0);
+
+    let mut op = SHFILEOPSTRUCTW {
+        wFunc: FO_DELETE,
+        pFrom: PCWSTR(from.as_ptr()),
+        fFlags: (FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT).0 as u16,
+        ..Default::default()
+    };
+    let code = unsafe { SHFileOperationW(&mut op) };
+    if code != 0 {
+        return Err(format!("Windows couldn't move it to the Recycle Bin (error {code})."));
+    }
+    if op.fAnyOperationsAborted.as_bool() {
+        return Err("Moving it to the Recycle Bin was cancelled.".into());
+    }
+    Ok(())
+}
+
 /// Our own `where`: walks %PATH% against %PATHEXT%, no shell involved.
 /// Rust quotes arguments correctly for `.cmd`/`.bat` targets since 1.77, so
 /// spawning `code.cmd` directly is safe.

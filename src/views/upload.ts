@@ -6,6 +6,7 @@
 
 import { h, clear } from "./dom";
 import { State } from "../core/state";
+import { newConversationAbout } from "./chat";
 import type { ViewActions, ViewHost } from "./views";
 
 /** Dashed rounded rect drawn as SVG so the dashes can march like on macOS. */
@@ -91,8 +92,8 @@ export function buildChoose(actions: ViewActions): ViewHost {
     { class: "actions" },
     h("button", {
       class: "btn primary",
-      text: "Ask a question",
-      onclick: () => actions.setView("prompt"),
+      text: "Ask a question about it",
+      onclick: () => void askAbout(),
     }),
     h("button", {
       class: "btn secondary",
@@ -100,6 +101,13 @@ export function buildChoose(actions: ViewActions): ViewHost {
       onclick: () => actions.setView(State.defaultView()),
     }),
   );
+  /** Always a blank conversation, with the file as its context. */
+  async function askAbout() {
+    const file = State.droppedFile;
+    if (file) await newConversationAbout(file).catch(() => {});
+    actions.setView("prompt");
+  }
+
   const el = h(
     "div",
     { class: "view" },

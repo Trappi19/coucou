@@ -12,6 +12,9 @@ import type { ViewActions, ViewHost } from "./views";
 /** Coming back to the view after this long reads the lists again. */
 const RELOAD_AFTER_MS = 5000;
 
+/** How long the delete button waits for its second click. */
+const CONFIRM_MS = 3000;
+
 /** "5 min", "3 h", "12 Mar": how long ago, shortest form. */
 export function ago(ms: number): string {
   if (!ms) return "";
@@ -57,6 +60,50 @@ export function buildSessions(actions: ViewActions): ViewHost {
   let opening = false;
   let error: string | null = null;
   let renderedKey = "";
+  /** The conversation whose delete button was clicked once. */
+  let confirmId: string | null = null;
+  let confirmTimer: number | null = null;
+  let deleting = false;
+
+  function clearConfirm() {
+    if (confirmTimer != null) window.clearTimeout(confirmTimer);
+    confirmTimer = null;
+    confirmId = null;
+  }
+
+  /** Two clicks: the first arms the button, the second sends it to the Recycle Bin. */
+  async function remove(project: ChatProject, session: ChatSession) {
+    if (deleting) return;
+    if (confirmId !== session.id) {
+      actions.blip();
+      clearConfirm();
+      confirmId = session.id;
+      confirmTimer = window.setTimeout(() => {
+        clearConfirm();
+        render();
+      }, CONFIRM_MS);
+      render();
+      return;
+    }
+    clearConfirm();
+    deleting = true;
+    error = null;
+    try {
+      await Bridge.chatDeleteSession(project.path, session.id);
+      actions.blip();
+      sessions = sessions.filter((s) => s.id !== session.id);
+      if (project.sessions) project.sessions -= 1;
+      // The chat was showing it: it is gone, so the chat starts afresh.
+      if (State.chatSessionId === session.id) {
+        State.clearChat();
+        State.notify();
+      }
+    } catch (err) {
+      error = message(err);
+    }
+    deleting = false;
+    render();
+  }
 
   async function load() {
     loading = true;
@@ -160,6 +207,18 @@ export function buildSessions(actions: ViewActions): ViewHost {
       note(current.isDefault ? "No conversation yet. Start one!" : "No conversation in this project yet.");
     }
     for (const s of sessions) {
+      const armed = confirmId === s.id;
+      // Not while Mochi is answering in it.
+      const busy = State.chatPending && s.id === State.chatSessionId;
+      const del = h(
+        "span",
+        { class: "del", title: armed ? "Click again to move it to the Recycle Bin" : "Delete conversation" },
+        armed ? h("span", { text: "Delete?" }) : svg(ICONS.trash, 11, { stroke: 1.9 }),
+      );
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (current) void remove(current, s);
+      });
       const row = h(
         "button",
         {
@@ -171,8 +230,10 @@ export function buildSessions(actions: ViewActions): ViewHost {
         },
         h("span", { class: "t", text: s.title }),
         h("span", { class: "a", text: ago(s.updated) }),
+        busy ? null : del,
       );
       row.classList.toggle("on", s.id === State.chatSessionId);
+      row.classList.toggle("confirm", armed);
       list.append(row);
     }
   }

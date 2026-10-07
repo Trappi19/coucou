@@ -285,6 +285,16 @@ fn chat_reset(chat: State<Chat>, cli: State<CliChat>) {
 }
 
 /// The Stop button: ends the Claude Code turn in flight.
+/// Sends one Claude Code conversation to the Recycle Bin.
+#[tauri::command]
+async fn chat_delete_session(app: AppHandle, path: String, session_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claude_code::delete_session(&app.state::<CliChat>(), &path, &session_id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 fn chat_cancel(cli: State<CliChat>) {
     cli.cancel();
@@ -492,6 +502,7 @@ pub fn run() {
             chat_send,
             chat_reset,
             chat_cancel,
+            chat_delete_session,
             chat_projects,
             chat_sessions,
             chat_open,

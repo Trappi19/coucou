@@ -683,6 +683,40 @@ fn load_history(project: &Path, id: &str) -> Result<Vec<HistoryMessage>, String>
 }
 
 /// Points the chat at a project, and at one of its conversations or a new one.
+/// Sends a conversation to the Recycle Bin: its transcript, and the folder
+/// Claude Code keeps beside it (sub-agents, large tool results) when there is one.
+pub fn delete_session(chat: &CliChat, project: &str, session_id: &str) -> Result<(), String> {
+    if !valid_session_id(session_id) {
+        return Err("Unknown conversation.".into());
+    }
+    let path = PathBuf::from(project);
+    let is_current = {
+        let current = chat.current.lock().unwrap();
+        let current_project = current.project.clone().unwrap_or_else(discussion_dir);
+        path_key(&current_project) == path_key(&path) && current.session_id.as_deref() == Some(session_id)
+    };
+    if is_current && chat.running.lock().unwrap().is_some() {
+        return Err("Mochi is still answering in this conversation.".into());
+    }
+    let dir = sessions_dir(&path);
+    let file = dir.join(format!("{session_id}.jsonl"));
+    if !file.is_file() {
+        return Err("This conversation can't be found any more.".into());
+    }
+    let mut targets = vec![file];
+    let extras = dir.join(session_id);
+    if extras.is_dir() {
+        targets.push(extras);
+    }
+    platform::move_to_trash(&targets)?;
+    // The chat was on it: the next message starts a new conversation.
+    if is_current {
+        chat.reset();
+    }
+    crate::log::line(format!("claude code: conversation {session_id} sent to the Recycle Bin"));
+    Ok(())
+}
+
 pub fn open(chat: &CliChat, project: &str, session_id: Option<&str>) -> Result<Vec<HistoryMessage>, String> {
     let path = PathBuf::from(project);
     let is_default = path_key(&path) == path_key(&discussion_dir());

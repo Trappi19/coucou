@@ -96,6 +96,9 @@ export const Bridge = {
   /** Discussion first, then every folder Claude Code has been used in. */
   chatProjects: () => callOrThrow<ChatProject[]>("chat_projects"),
   chatSessions: (path: string) => callOrThrow<ChatSession[]>("chat_sessions", { path }),
+  /** Sends a conversation to the Recycle Bin (it can be restored from there). */
+  chatDeleteSession: (path: string, sessionId: string) =>
+    callOrThrow<void>("chat_delete_session", { path, sessionId }),
   /** Points the chat at a project and a conversation (null = a new one); returns its messages. */
   chatOpen: (path: string, sessionId: string | null) =>
     callOrThrow<{ role: "user" | "assistant"; content: string }[]>("chat_open", { path, sessionId }),
