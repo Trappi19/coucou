@@ -501,7 +501,11 @@ export class Island {
   /** Alert from the hook server: open on this view. Pinned alerts never auto-close. */
   alert(view: IslandViewName) {
     this.fsm.pinned = State.isPinned;
+    // Opening goes straight to this view. Passing through the default one would
+    // end a drop sequence the drag has just started.
+    this.reopenView = view;
     this.fsm.forceHome();
+    this.reopenView = null;
     this.expand(view);
   }
 
@@ -567,6 +571,9 @@ export class Island {
     State.promptContext = { kind: "file", name, path };
     void Bridge.chatReset();
 
+    // A drop with no drag-enter before it (or one that ended the sequence)
+    // still gets the whole animation rather than a bar stuck at 0 %.
+    if (!UploadSeq.isActive) UploadSeq.enterZone(State.mouseInIsland.x, State.mouseInIsland.y);
     UploadSeq.performDrop(State.uploadDuration);
     this.uploadTens = 0;
     this.uploadDone = false;
@@ -605,6 +612,7 @@ export class Island {
     if (since == null) return;
     const dur = State.uploadDuration;
     const p = Math.max(0, Math.min(1, (since - PRE_PROGRESS) / dur));
+    State.uploadProgress = p;
 
     const tens = Math.floor(p * 10);
     if (tens > this.uploadTens && tens < 10) {

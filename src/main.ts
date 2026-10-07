@@ -7,6 +7,7 @@ import { State, type Settings } from "./core/state";
 import { Island } from "./island/island";
 import { registerHookHandlers } from "./island/hooks";
 import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
+import { streamReply } from "./views/chat";
 
 /** Whether whoever answers the chat is set up, for the badge in the island's settings. */
 async function refreshChatReady() {
@@ -46,6 +47,9 @@ async function main() {
     State.stateOverride = tool === "WebSearch" || tool === "WebFetch" ? "searching" : "thinking";
     State.notify();
   });
+
+  // The answer as Claude Code writes it.
+  await onEvent<{ text: string; reset: boolean }>("chat-delta", (delta) => streamReply(delta));
 
   void refreshChatReady();
 

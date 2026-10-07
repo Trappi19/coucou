@@ -993,6 +993,20 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--red-text);
 }
 
+/* The answer being written: each new piece fades in (chat.ts, FADE_MS). */
+.reply .fresh {
+  animation: reply-fade 0.35s ease-out both;
+}
+
+@keyframes reply-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Project and conversation above the messages. */
 .chat-top {
   display: flex;

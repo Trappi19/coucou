@@ -25,6 +25,137 @@ function bubble(message: ChatMessage): HTMLElement {
   return h("div", { class: "chat-row" }, h("div", { class: cls, text: message.content }));
 }
 
+// ── The answer being written ─────────────────────────────────────────────────
+
+/** Fade of each newly shown piece of text (style.css, `.reply .fresh`). */
+const FADE_MS = 350;
+/** Longest the end of an answer may take to show before it is put in whole. */
+const FINISH_MAX_MS = 4000;
+
+/**
+ * The reply as it arrives, shown a little behind the text received so the
+ * words flow in evenly instead of in bursts: each frame reveals a share of
+ * what is waiting, and every new piece fades in. Runs only while there is
+ * text left to show.
+ */
+class LiveReply {
+  readonly el: HTMLElement;
+  private body: HTMLElement;
+  private target = "";
+  private shown = 0;
+  private raf = 0;
+  private last = 0;
+  private final = false;
+  private done: (() => void) | null = null;
+  /** The view redraws its log when the live bubble appears or goes. */
+  onPresence: () => void = () => {};
+
+  constructor() {
+    this.body = h("div", { class: "reply" });
+    this.el = h("div", { class: "chat-row" }, this.body);
+  }
+
+  get active(): boolean {
+    return this.target.length > 0;
+  }
+
+  /** Called by the log after it has scrolled, to keep following the text. */
+  follow: () => void = () => {};
+
+  append(text: string) {
+    if (this.final) return;
+    const was = this.active;
+    // Leading blank lines would show as an empty bubble.
+    this.target = this.target ? this.target + text : text.trimStart();
+    if (this.active !== was) this.onPresence();
+    this.run();
+  }
+
+  reset() {
+    const was = this.active;
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    this.target = "";
+    this.shown = 0;
+    this.final = false;
+    this.done?.();
+    this.done = null;
+    clear(this.body);
+    if (was) this.onPresence();
+  }
+
+  /** The whole answer is known: show the rest of it, resolve once it is on screen. */
+  finish(text: string): Promise<void> {
+    const sofar = this.target.slice(0, Math.floor(this.shown));
+    if (!text.startsWith(sofar)) {
+      clear(this.body);
+      this.shown = 0;
+    }
+    const was = this.active;
+    this.target = text;
+    this.final = true;
+    if (this.active !== was) this.onPresence();
+    return new Promise((resolve) => {
+      // Frames can stop coming (the webview throttles a window it thinks is
+      // out of sight): the answer must land in the conversation regardless.
+      const deadline = window.setTimeout(() => settle(), FINISH_MAX_MS);
+      const settle = () => {
+        window.clearTimeout(deadline);
+        if (this.done === settle) this.done = null;
+        resolve();
+      };
+      this.done = settle;
+      this.run();
+    });
+  }
+
+  private run() {
+    if (this.raf) return;
+    this.last = performance.now();
+    this.raf = requestAnimationFrame(this.step);
+  }
+
+  private step = (now: number) => {
+    const dt = Math.min(64, now - this.last);
+    this.last = now;
+    const backlog = this.target.length - this.shown;
+    if (backlog <= 0) {
+      this.raf = 0;
+      if (this.final && this.done) {
+        const done = this.done;
+        this.done = null;
+        // Let the last piece finish fading before the bubble is replaced.
+        window.setTimeout(done, FADE_MS);
+      }
+      return;
+    }
+    // Fast when far behind, never slower than ~90 characters a second; quicker
+    // still once the answer is complete.
+    const share = this.final ? 0.12 : 0.06;
+    const next = Math.min(this.target.length, this.shown + Math.max(backlog * share, 1.5) * (dt / 16.7));
+    const from = Math.floor(this.shown);
+    let to = Math.floor(next);
+    // Never split an emoji (a surrogate pair) across two pieces.
+    const code = this.target.charCodeAt(to - 1);
+    if (to < this.target.length && code >= 0xd800 && code <= 0xdbff) to++;
+    if (to > from) {
+      this.body.append(h("span", { class: "fresh", text: this.target.slice(from, to) }));
+      this.follow();
+    }
+    this.shown = Math.max(next, to);
+    this.raf = requestAnimationFrame(this.step);
+  };
+}
+
+const live = new LiveReply();
+
+/** A piece of the answer from Claude Code (main.ts, "chat-delta"). */
+export function streamReply(delta: { text: string; reset: boolean }) {
+  if (!State.chatPending) return;
+  if (delta.reset) live.reset();
+  else live.append(delta.text);
+}
+
 /** The dots, and what Claude Code is busy with when it says so. */
 function typingDots(label: string | null): HTMLElement {
   return h(
@@ -127,6 +258,16 @@ export function buildPrompt(actions: ViewActions, onHeightChange: () => void): V
 
   let renderedKey = "";
   let projectKey = "";
+
+  /** Following the answer down, unless the user scrolled up to read. */
+  let stickToBottom = true;
+  log.addEventListener("scroll", () => {
+    stickToBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
+  });
+  live.follow = () => {
+    if (stickToBottom) log.scrollTop = log.scrollHeight;
+  };
+  live.onPresence = () => State.notify();
   let sendMode: "send" | "stop" = "send";
 
   async function startNew() {
@@ -159,11 +300,14 @@ export function buildPrompt(actions: ViewActions, onHeightChange: () => void): V
     const context: ChatContext | null =
       first && file ? { kind: "file", name: file.name, path: file.path } : null;
 
+    live.reset();
     try {
       const reply = await Bridge.chatSend(query, context);
       if (reply.sessionId) State.chatSessionId = reply.sessionId;
-      State.chatHistory.push({ id: nextId++, role: "assistant", content: reply.text });
       Sound.play("finish");
+      // The end of the answer flows in like the rest (all of it, from the API).
+      await live.finish(reply.text);
+      State.chatHistory.push({ id: nextId++, role: "assistant", content: reply.text });
     } catch (err) {
       const message = String(err).replace(/^Error:\s*/, "");
       if (message === "Stopped.") {
@@ -173,6 +317,7 @@ export function buildPrompt(actions: ViewActions, onHeightChange: () => void): V
         Sound.play("error");
       }
     } finally {
+      live.reset();
       State.chatPending = false;
       State.chatActivity = null;
       State.stateOverride = null;
@@ -238,13 +383,17 @@ export function buildPrompt(actions: ViewActions, onHeightChange: () => void): V
         State.chatHistory.length,
         pending,
         State.chatActivity ?? "",
+        live.active,
       ].join("|");
       if (key !== renderedKey) {
         renderedKey = key;
         clear(log);
         for (const m of State.chatHistory) log.append(bubble(m));
-        if (pending) log.append(typingDots(State.chatActivity));
+        // The answer being written takes the place of the dots.
+        if (live.active) log.append(live.el);
+        else if (pending) log.append(typingDots(State.chatActivity));
         log.scrollTop = log.scrollHeight;
+        stickToBottom = true;
       }
 
       // Claude Code turns can be stopped; an API call just has to finish.

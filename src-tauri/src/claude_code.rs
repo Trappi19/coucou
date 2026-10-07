@@ -137,6 +137,14 @@ struct Activity {
     label: String,
 }
 
+/// A piece of the answer as it is written. `reset` = a new message starts, and
+/// what was streamed so far (the words before a tool call) is not the answer.
+#[derive(Serialize, Clone)]
+struct ChatDelta {
+    text: String,
+    reset: bool,
+}
+
 // ── The executable ───────────────────────────────────────────────────────────
 
 pub fn find_cli() -> Option<PathBuf> {
@@ -233,7 +241,7 @@ fn run_turn(
     };
 
     let mut cmd = base_command(&exe);
-    cmd.args(["-p", "--output-format", "stream-json", "--verbose"])
+    cmd.args(["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages"])
         .args(["--append-system-prompt", SYSTEM_PROMPT])
         .args(["--tools", TOOLS, "--allowedTools", TOOLS])
         .arg("--strict-mcp-config");
@@ -292,6 +300,7 @@ fn run_turn(
             }
             match event.get("type").and_then(Value::as_str) {
                 Some("assistant") => report_tools(app, &event),
+                Some("stream_event") => stream_text(app, &event),
                 Some("result") => result = Some(event),
                 _ => {}
             }
@@ -378,6 +387,23 @@ fn context_block(context: &ChatContext) -> String {
         }
     };
     format!("<mochi-context>\n{body}\n</mochi-context>")
+}
+
+/// The answer word by word, so the island can show it while it is written.
+fn stream_text(app: &AppHandle, event: &Value) {
+    let Some(inner) = event.get("event") else { return };
+    let delta = match inner.get("type").and_then(Value::as_str) {
+        Some("message_start") => ChatDelta { text: String::new(), reset: true },
+        Some("content_block_delta") if inner.pointer("/delta/type").and_then(Value::as_str) == Some("text_delta") => {
+            let text = inner.pointer("/delta/text").and_then(Value::as_str).unwrap_or("");
+            if text.is_empty() {
+                return;
+            }
+            ChatDelta { text: text.to_string(), reset: false }
+        }
+        _ => return,
+    };
+    let _ = app.emit_to(island::WINDOW_LABEL, "chat-delta", delta);
 }
 
 /// Tool calls become the line under the typing dots ("Searching the web…").
