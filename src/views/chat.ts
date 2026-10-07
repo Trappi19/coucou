@@ -208,6 +208,7 @@ export function buildPrompt(actions: ViewActions, onHeightChange: () => void): V
 
   return {
     el,
+    keyboard: true,
     sync() {
       const claudeCode = State.usesClaudeCode;
       projectBtn.style.display = claudeCode ? "" : "none";

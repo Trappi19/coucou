@@ -71,6 +71,19 @@ in time, Coucou stays quiet and Claude Code asks in the terminal as usual.
 
 It works from any terminal — Windows Terminal, PowerShell, VS Code, Git Bash.
 
+## Notes
+
+The notes tab (next to the clock) keeps notes on this PC only, in
+`%APPDATA%\Coucou\notes.json` — nothing is sent anywhere. Each note has a title,
+an optional folder and any number of tags; the menu above the list shows all
+notes, one folder or one tag, and the search field looks through titles, text
+and tags.
+
+Formatting: **Ctrl+B / I / U**, Ctrl+Shift+X (strikethrough), or the toolbar.
+At the start of a line, `- ` starts a bulleted list, `1. ` a numbered one, `[] `
+a checklist and `# ` a heading. Tab nests a list item. Pasting keeps the text
+only. Notes are saved as you type.
+
 ## Chat and keys
 
 **Settings… → Claude** takes your Anthropic API key. Keys live in the **Windows

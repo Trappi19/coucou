@@ -7,6 +7,7 @@ mod hooks;
 mod integrations;
 mod island;
 mod log;
+mod notes;
 mod pipe;
 mod platform;
 mod secrets;
@@ -364,6 +365,22 @@ async fn refresh_integration(app: AppHandle, id: String) {
 
 /// Lets the island write to the same log as the Rust side.
 #[tauri::command]
+async fn notes_load() -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(notes::load)
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn notes_save(json: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || notes::save(&json))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn log_line(message: String) {
     log::line(format!("ui  {message}"));
 }
@@ -470,6 +487,8 @@ pub fn run() {
             approval_ack,
             approval_decline,
             log_line,
+            notes_load,
+            notes_save,
             chat_send,
             chat_reset,
             chat_cancel,

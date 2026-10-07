@@ -9,6 +9,7 @@ import { State, type AgentTask } from "../core/state";
 import { washRGBA, type IslandViewName, type Wash } from "../core/layout";
 import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
 import { buildPrompt } from "./chat";
+import { buildNotes } from "./notes";
 import { buildSessions } from "./sessions";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
 import { renderIntegrationCard, type IntegrationCardHooks } from "./integrations";
@@ -40,8 +41,14 @@ export interface ViewHost {
   focus?(): void;
   /** Called each time the view comes on screen. */
   show?(): void;
+  /** Called when the view goes off screen, or the island folds on it. */
+  hide?(): void;
   /** Called every frame while the view is on screen. */
   tick?(nowMs: number): void;
+  /** The view has text fields: the island takes keyboard focus while it is on. */
+  keyboard?: boolean;
+  /** In use right now (something being typed): the island must not fold by itself. */
+  engaged?(): boolean;
 }
 
 // ── Shared pieces ─────────────────────────────────────────────────────────────
@@ -89,6 +96,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
   const tabChat = h("button", { class: "tab", title: "Ask", onclick: () => go("prompt") }, svg(ICONS.bubble, 13));
   const tabDrop = h("button", { class: "tab", title: "Drop", onclick: () => go("upload") }, svg(ICONS.plus, 13));
   const tabHistory = h("button", { class: "tab", title: "Conversations", onclick: () => go("sessions") }, svg(ICONS.clock, 13));
+  const tabNotes = h("button", { class: "tab", title: "Notes", onclick: () => go("notes") }, svg(ICONS.note, 13, { stroke: 2.1 }));
 
   const gearBtn = h("button", { title: "Settings", onclick: () => go("settings") }, svg(ICONS.gear, 14));
   const soundBtn = h("button", { title: "Mute", onclick: () => actions.toggleSound() }, svg(ICONS.speakerOn, 14));
@@ -108,7 +116,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
   const el = h(
     "div",
     { id: "header" },
-    h("div", { class: "tabs" }, tabHome, tabChat, tabHistory, tabDrop),
+    h("div", { class: "tabs" }, tabHome, tabChat, tabHistory, tabNotes, tabDrop),
     h("div", { class: "header-actions" }, gearBtn, soundBtn, foldBtn),
   );
 
@@ -120,6 +128,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
       tabChat.classList.toggle("on", v === "prompt");
       tabHistory.classList.toggle("on", v === "sessions");
       tabHistory.style.display = State.usesClaudeCode ? "" : "none";
+      tabNotes.classList.toggle("on", v === "notes");
       tabDrop.classList.toggle("on", v === "upload");
       gearBtn.classList.toggle("on", v === "settings");
       clear(gearBtn);
@@ -454,7 +463,7 @@ function buildSettings(actions: ViewActions): ViewHost {
       h("span", { text: "Open on hover", title: "Rest the cursor on Mochi to open it, no click needed" }),
       h("div", { style: "width:14px" }),
       chatFoldSwitch,
-      h("span", { text: "Fold during chats", title: "A conversation folds too (timer, click elsewhere). Otherwise use ⌃ or Esc" }),
+      h("span", { text: "Fold during chats", title: "A conversation or a note being written folds too (timer, click elsewhere). Otherwise use ⌃ or Esc" }),
     ),
     h(
       "div",
@@ -557,6 +566,7 @@ export function buildViews(
   map.set("resize", buildResize());
   map.set("prompt", buildPrompt(actions, onChatHeightChange));
   map.set("sessions", buildSessions(actions));
+  map.set("notes", buildNotes(actions));
   map.set("upload", buildUpload());
   map.set("uploading", buildUploading());
   map.set("choose", buildChoose(actions));

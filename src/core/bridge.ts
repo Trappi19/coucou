@@ -107,6 +107,12 @@ export const Bridge = {
   secretSet: (key: string, value: string) => callOrThrow<void>("secret_set", { key, value }),
   secretClear: (key: string) => callOrThrow<void>("secret_clear", { key }),
 
+  // ── Notes ─────────────────────────────────────────────────────────────────
+  /** The stored notes document (JSON text), or null when there is none yet. */
+  notesLoad: () => callOrThrow<string | null>("notes_load"),
+  /** Replaces notes.json with this document, atomically. */
+  notesSave: (json: string) => callOrThrow<void>("notes_save", { json }),
+
   // ── Integrations ──────────────────────────────────────────────────────────
   refreshIntegration: (id: string) => call<void>("refresh_integration", { id }),
   /** Opens the configured n8n instance in the browser. */

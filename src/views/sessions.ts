@@ -12,7 +12,8 @@ import type { ViewActions, ViewHost } from "./views";
 /** Coming back to the view after this long reads the lists again. */
 const RELOAD_AFTER_MS = 5000;
 
-function ago(ms: number): string {
+/** "5 min", "3 h", "12 Mar": how long ago, shortest form. */
+export function ago(ms: number): string {
   if (!ms) return "";
   const s = (Date.now() - ms) / 1000;
   if (s < 60) return "now";

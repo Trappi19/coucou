@@ -50,4 +50,16 @@ export const ICONS = {
   chevronDown: "M5.5 9 12 15.5 18.5 9",
   // doc.text
   doc: "M6.5 2.6h7l4 4v14.8h-11V2.6zm6.6 1.6v3.3h3.3l-3.3-3.3zM8.6 11h6.8v1.5H8.6V11zm0 3.4h6.8v1.5H8.6v-1.5z",
+  // note.text — stroke icons below, drawn with svg(…, { stroke })
+  note: "M6 3.8h12a1.8 1.8 0 0 1 1.8 1.8v8.6l-5.8 5.8H6a1.8 1.8 0 0 1-1.8-1.8V5.6A1.8 1.8 0 0 1 6 3.8zM14 19.8v-4a1.6 1.6 0 0 1 1.6-1.6h4M8.2 8.6h7.6M8.2 12.2h4.6",
+  // list.bullet
+  listBullet: "M9.5 6.5H20M9.5 12H20M9.5 17.5H20M4.6 6.5h.01M4.6 12h.01M4.6 17.5h.01",
+  // checklist
+  checklist: "M3.8 7.2l1.8 1.8 3.2-3.4M12 7.4h8M3.8 15.2l1.8 1.8 3.2-3.4M12 15.4h8",
+  // trash
+  trash: "M4.5 6.6h15M9.4 6.6V4.6h5.2v2M6.6 6.6l.9 12.8h9l.9-12.8M10.3 10.2v5.8M13.7 10.2v5.8",
+  // tag
+  tag: "M3.9 12.4V5a1.1 1.1 0 0 1 1.1-1.1h7.4l7.7 7.7a1.4 1.4 0 0 1 0 2l-6.4 6.4a1.4 1.4 0 0 1-2 0L3.9 12.4zM8.3 8.3h.01",
+  // magnifyingglass
+  search: "M10.6 4.6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM15.1 15.1l4.4 4.4",
 } as const;

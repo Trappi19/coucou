@@ -296,8 +296,8 @@ export class Island {
   /**
    * The island is in use and must not fold by itself — not on a timer, not on
    * a click elsewhere: an alert waiting for an answer, a file being dropped, or
-   * a conversation (even one only being typed), unless the user chose to let
-   * conversations fold too.
+   * a conversation (even one only being typed) or a note being written, unless
+   * the user chose to let those fold too.
    */
   private get engaged(): boolean {
     if (State.resizing || State.isPinned || State.fileDragOver) return true;
@@ -305,6 +305,7 @@ export class Island {
     if (State.view === "prompt" && !State.settings.foldDuringChat) {
       return State.chatHistory.length > 0 || State.chatDraft.trim() !== "" || State.droppedFile != null;
     }
+    if (!State.settings.foldDuringChat && this.views.get(State.view)?.engaged?.()) return true;
     return false;
   }
 
@@ -432,7 +433,13 @@ export class Island {
       Sound.play("close");
       State.isPinned = false;
       void Bridge.focusWindow(false);
-      this.reopenView = State.view === "prompt" && State.chatHistory.length > 0 ? "prompt" : null;
+      const shown = this.views.get(State.view);
+      const midChat = State.view === "prompt" && State.chatHistory.length > 0;
+      const midNote = State.view === "notes" && (shown?.engaged?.() ?? false);
+      this.reopenView = midChat || midNote ? State.view : null;
+      shown?.hide?.();
+      // Opening again shows the view afresh, keyboard focus included.
+      this.lastSyncedView = null;
     }
     if (mode !== "expanded") {
       this.engine.resetMorph();
@@ -1050,16 +1057,18 @@ export class Island {
       if (on) view.sync();
     }
 
-    // The chat is the only view with a text field, so it is the only time the
-    // island is allowed to take keyboard focus.
-    if (this.lastSyncedView !== State.view) {
-      const wasChat = this.lastSyncedView === "prompt";
+    // Only the views with a text field (the chat, notes) let the island take
+    // keyboard focus, and only while they are on screen.
+    if (expanded && this.lastSyncedView !== State.view) {
+      const prev = this.lastSyncedView ? this.views.get(this.lastSyncedView) : undefined;
+      const next = this.views.get(State.view);
       this.lastSyncedView = State.view;
-      this.views.get(State.view)?.show?.();
-      if (State.view === "prompt") {
+      prev?.hide?.();
+      next?.show?.();
+      if (next?.keyboard) {
         void Bridge.focusWindow(true);
-        window.setTimeout(() => this.views.get("prompt")?.focus?.(), 120);
-      } else if (wasChat) {
+        if (next.focus) window.setTimeout(() => next.focus?.(), 120);
+      } else if (prev?.keyboard) {
         void Bridge.focusWindow(false);
       }
     }

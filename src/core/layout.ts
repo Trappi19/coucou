@@ -18,6 +18,7 @@ export type IslandViewName =
   | "mail"
   | "prompt"
   | "sessions"
+  | "notes"
   | "searching"
   | "result"
   | "note"
@@ -85,6 +86,8 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   prompt: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
   // Projects and conversations to pick from. Same left column for Mochi as the chat.
   sessions: { height: 270, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
+  // Notes: a list and an editor, as tall as the panel allows. Mochi keeps the chat's column.
+  notes: { height: 300, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
   searching: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
   result: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
   note: { height: 160, botX: 60, botY: null, botDiameter: 50, agentMode: "column" },
