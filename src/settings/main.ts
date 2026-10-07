@@ -9,6 +9,8 @@ import { h, clear } from "../views/dom";
 
 let settings: Settings = { ...DEFAULT_SETTINGS };
 let version = "";
+/** Redraws what shows the island size, when it changes from the island. */
+const sizeListeners: (() => void)[] = [];
 
 const root = document.getElementById("settings-root")!;
 
@@ -465,6 +467,25 @@ function generalSection(): HTMLElement {
     void save();
   });
 
+  // Sizes are set on the island itself (handles + ✓); here only shown and reset.
+  const sizeLabel = h("span", { class: "hint" });
+  const resetSize = h("button", {
+    text: "Default size",
+    onclick: () => {
+      settings.compactScale = 1;
+      settings.expandedScale = 1;
+      void save();
+      showSize();
+    },
+  });
+  const showSize = () => {
+    const pct = (s: number) => `${Math.round((s ?? 1) * 100)} %`;
+    sizeLabel.textContent = `open ${pct(settings.expandedScale)} · small ${pct(settings.compactScale)}`;
+    resetSize.toggleAttribute("disabled", settings.compactScale === 1 && settings.expandedScale === 1);
+  };
+  showSize();
+  sizeListeners.push(showSize);
+
   const screen = h("select", {}) as HTMLSelectElement;
   screen.append(
     h("option", { value: "primary", text: "Main display" }),
@@ -499,6 +520,12 @@ function generalSection(): HTMLElement {
       h("label", { text: "Fold during chats" }),
       toggle(settings.foldDuringChat, (v) => { settings.foldDuringChat = v; void save(); }),
       h("span", { class: "hint", text: "an open conversation folds too; otherwise it stays until ⌃ or Esc" }),
+    ),
+    h("div", { class: "row" },
+      h("label", { text: "Island size" }),
+      sizeLabel,
+      h("button", { text: "Adjust…", onclick: () => void Bridge.startIslandResize() }),
+      resetSize,
     ),
     h("div", { class: "row" },
       h("label", { text: "Island lives on" }),
@@ -548,6 +575,8 @@ async function main() {
 
   void onEvent<Settings>("settings-changed", (s) => {
     settings = { ...settings, ...s };
+    // A size validated on the island shows up here at once.
+    for (const fn of sizeListeners) fn();
   });
 }
 

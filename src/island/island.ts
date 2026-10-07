@@ -9,6 +9,7 @@ import {
   islandSize,
   type IslandMode, type IslandViewName,
 } from "../core/layout";
+import { SCALE_MAX, canvasDpr, clampScale, setRenderScale } from "../core/scale";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
 import { BotEngine, hexToRGB } from "../mochi/engine";
@@ -19,6 +20,7 @@ import { USC, UploadSeq } from "../upload/sequence";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
 import { h } from "../views/dom";
 import { IslandStateMachine } from "./fsm";
+import { ResizeController, type ResizeTarget } from "./resize";
 
 const BOT_OVERHANG = 40;
 /** Same margin as the Rust hit test (src-tauri/src/island.rs). */
@@ -60,6 +62,13 @@ export class Island {
   private width = new Tracked(NOTCH_W);
   private height = new Tracked(0);
   private radius = new Tracked(ROUNDED_CORNER);
+  /** The user's island size (zoom), springing between the compact and open ones. */
+  private scale = new Tracked(1);
+  private scaleReady = false;
+  /** Scale the panel window is currently sized for (Rust side). */
+  private panelScale = 1;
+  private panelTimer: number | null = null;
+  private resize!: ResizeController;
   private botCx = new Spring(46);
   private botCy = new Spring(16);
   private botSize = new Spring(10);
@@ -71,6 +80,8 @@ export class Island {
   private lastFrame = 0;
   private dirty = true;
   private canvasPx = 0;
+  private canvasDprUsed = 0;
+  private greetingDpr = 0;
 
   // Rust starts the window at full size so the launch greeting has room.
   private collapsed = false;
@@ -178,6 +189,7 @@ export class Island {
         this.applySettings();
         void Bridge.saveSettings(State.settings);
       },
+      startResize: () => this.startResize(),
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
       blip: () => Sound.play("blip"),
     };
@@ -214,6 +226,20 @@ export class Island {
       this.uploadCanvas.el,
       this.contentEl,
     );
+    this.resize = new ResizeController({
+      setTarget: (t) => this.setResizeTarget(t),
+      preview: () => {
+        this.animateGeometry(false);
+        State.notify();
+      },
+      cancel: () => this.endResize(false),
+      confirm: () => this.endResize(true),
+      baseSize: () => {
+        const { w, h } = islandSize(State.mode, State.view, State.chatHistory.length);
+        return { w, h: Math.max(h, 1) };
+      },
+    });
+
     this.islandEl = h(
       "div",
       { id: "island" },
@@ -222,15 +248,14 @@ export class Island {
       this.botCanvas,
       this.miniGrid,
       this.countdown,
+      ...this.resize.handles,
     );
 
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    this.greetingCanvas.width = Math.round(EXPANDED_W * dpr);
-    this.greetingCanvas.height = Math.round(150 * dpr);
     this.greetingCanvas.style.width = `${EXPANDED_W}px`;
     this.greetingCanvas.style.height = "150px";
+    this.sizeGreetingCanvas();
 
-    this.root.append(this.wakeStrip, this.islandEl);
+    this.root.append(this.wakeStrip, this.islandEl, this.resize.bar);
     this.applyGeometry();
   }
 
@@ -275,7 +300,7 @@ export class Island {
    * conversations fold too.
    */
   private get engaged(): boolean {
-    if (State.isPinned || State.fileDragOver) return true;
+    if (State.resizing || State.isPinned || State.fileDragOver) return true;
     if (State.view === "uploading" || State.view === "choose") return true;
     if (State.view === "prompt" && !State.settings.foldDuringChat) {
       return State.chatHistory.length > 0 || State.chatDraft.trim() !== "" || State.droppedFile != null;
@@ -287,6 +312,113 @@ export class Island {
   outsideClick() {
     if (this.fsm.state !== "home" || this.engaged) return;
     this.collapse();
+  }
+
+  // ── Size (zoom) ─────────────────────────────────────────────────────────────
+
+  /** The zoom the island should be at: the one being tried, or the saved one. */
+  private targetScale(): number {
+    const s = State.resizing
+      ? State.resizeScales
+      : { compact: State.settings.compactScale, expanded: State.settings.expandedScale };
+    return State.mode === "expanded" ? s.expanded : s.compact;
+  }
+
+  /** The saved sizes changed (or were just loaded): follow them, panel included. */
+  private applyScaleSettings() {
+    State.settings.compactScale = clampScale(State.settings.compactScale);
+    State.settings.expandedScale = clampScale(State.settings.expandedScale);
+    if (State.resizing) return;
+    const max = Math.max(State.settings.compactScale, State.settings.expandedScale);
+    setRenderScale(max);
+    if (!this.scaleReady) {
+      this.scaleReady = true;
+      this.scale.jump(this.targetScale());
+    }
+    this.resizePanel(max);
+    this.animateGeometry(false);
+  }
+
+  /**
+   * Grows the window at once; shrinks it only once the island has settled, so
+   * the spring's overshoot is never cut off by the window edge.
+   */
+  private resizePanel(scale: number) {
+    if (this.panelTimer != null) window.clearTimeout(this.panelTimer);
+    this.panelTimer = null;
+    if (scale === this.panelScale) return;
+    if (scale > this.panelScale) {
+      this.panelScale = scale;
+      void Bridge.setPanelScale(scale);
+      return;
+    }
+    this.panelTimer = window.setTimeout(() => {
+      this.panelTimer = null;
+      this.panelScale = scale;
+      void Bridge.setPanelScale(scale);
+    }, 900);
+  }
+
+  /** Resize mode: the island holds still (Mochi still lives) while its size is set. */
+  startResize() {
+    if (State.resizing) return;
+    State.resizing = true;
+    State.resizeScales = {
+      compact: State.settings.compactScale,
+      expanded: State.settings.expandedScale,
+    };
+    State.resizeTarget = "expanded";
+    this.fsm.freeze(true);
+    // Room for the largest size while dragging, and canvases sharp at any size.
+    setRenderScale(SCALE_MAX);
+    this.resizePanel(SCALE_MAX);
+    Sound.play("blip");
+    this.showResizeTarget();
+  }
+
+  private setResizeTarget(target: ResizeTarget) {
+    if (State.resizeTarget === target) return;
+    Sound.play("blip");
+    State.resizeTarget = target;
+    this.showResizeTarget();
+  }
+
+  /** Shows the island being sized: open (with a line of help) or compact. */
+  private showResizeTarget() {
+    if (State.resizeTarget === "expanded") {
+      this.fsm.forceHome();
+      this.expand("resize");
+    } else {
+      this.fsm.forcePetit();
+    }
+    this.animateGeometry(false);
+    State.notify();
+  }
+
+  /** ✓ keeps the sizes tried, ✕ (or Esc) goes back to the saved ones. */
+  private endResize(save: boolean) {
+    if (!State.resizing) return;
+    if (save) {
+      State.settings.compactScale = State.resizeScales.compact;
+      State.settings.expandedScale = State.resizeScales.expanded;
+      void Bridge.saveSettings(State.settings);
+    }
+    State.resizing = false;
+    this.fsm.freeze(false);
+    Sound.play(save ? "approve" : "blip");
+    // Back where resizing was started from.
+    this.fsm.forceHome();
+    this.setView("settings");
+    this.applyScaleSettings();
+    State.notify();
+  }
+
+  private sizeGreetingCanvas() {
+    const dpr = canvasDpr();
+    if (dpr === this.greetingDpr) return;
+    this.greetingDpr = dpr;
+    this.greetingCanvas.width = Math.round(EXPANDED_W * dpr);
+    this.greetingCanvas.height = Math.round(150 * dpr);
   }
 
   // ── Mode / view ─────────────────────────────────────────────────────────────
@@ -503,6 +635,9 @@ export class Island {
       this.height.springTo(h);
       this.radius.springTo(r);
     }
+    // Always a spring, both ways: changing size is the same bubbly motion as opening.
+    const s = this.targetScale();
+    if (Math.abs(s - this.scale.value) > 0.001) this.scale.springTo(s, 0.45, 0.62);
     this.ensureRunning();
   }
 
@@ -510,10 +645,12 @@ export class Island {
     const w = this.width.value;
     const hh = this.height.value;
     const r = this.radius.value;
+    const s = this.scale.value;
     this.islandEl.style.width = `${w}px`;
     this.islandEl.style.height = `${hh}px`;
     this.islandEl.style.borderRadius = `0 0 ${r}px ${r}px`;
-    this.islandEl.style.transform = `translateX(-50%)`;
+    // Scaled from its top centre (style.css), so it grows the same on both sides.
+    this.islandEl.style.transform = `translateX(-50%) scale(${s})`;
     // These follow the island as it resizes, so they belong here rather than in
     // the state-driven DOM sync.
     this.miniGrid.style.left = `${w - 40 - 14.5}px`;
@@ -521,7 +658,17 @@ export class Island {
     this.greetingCanvas.style.left = `${(w - EXPANDED_W) / 2}px`;
     this.uploadCanvas.el.style.left = `${(w - EXPANDED_W) / 2}px`;
 
-    const rect = { x: (PANEL_W - w) / 2, y: 0, w, h: hh };
+    let rect = this.islandRect();
+    if (State.resizing) {
+      // The bar under the island has to take clicks too.
+      this.resize.place(rect.h);
+      const bar = this.resize.rect();
+      if (bar) {
+        const x0 = Math.min(rect.x, bar.x);
+        const x1 = Math.max(rect.x + rect.w, bar.x + bar.w);
+        rect = { x: x0, y: 0, w: x1 - x0, h: Math.max(rect.h, bar.y + bar.h) };
+      }
+    }
     const p = this.pushedRect;
     if (Math.abs(p.x - rect.x) > 0.5 || Math.abs(p.w - rect.w) > 0.5 || Math.abs(p.h - rect.h) > 0.5) {
       this.pushedRect = rect;
@@ -529,11 +676,16 @@ export class Island {
     }
   }
 
-  /** Island rect in window coordinates (origin top-left of the 720×320 window). */
+  /**
+   * Island rect in window coordinates, as drawn: scaled, and centred in the
+   * window (which grows with the scale, so it is not always 720 wide).
+   */
   private islandRect(): { x: number; y: number; w: number; h: number } {
-    const w = this.width.value;
-    const hh = this.height.value;
-    return { x: (PANEL_W - w) / 2, y: 0, w, h: hh };
+    const s = this.scale.value;
+    const w = this.width.value * s;
+    const hh = this.height.value * s;
+    const panelW = document.documentElement.clientWidth || PANEL_W;
+    return { x: (panelW - w) / 2, y: 0, w, h: hh };
   }
 
   // ── Window collapse (hidden → tiny wake strip, zero polling) ────────────────
@@ -582,7 +734,8 @@ export class Island {
     });
 
     window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && State.mode === "expanded" && !State.isPinned) this.collapse();
+      if (e.key === "Escape" && State.resizing) this.endResize(false);
+      else if (e.key === "Escape" && State.mode === "expanded" && !State.isPinned) this.collapse();
       State.lastActivity = performance.now();
     });
 
@@ -610,7 +763,9 @@ export class Island {
   onCursor(x: number, y: number) {
     State.mouse = { x, y };
     const rect = this.islandRect();
-    State.mouseInIsland = { x: x - rect.x, y: y - rect.y };
+    // In the island's own (unscaled) coordinates, like everything drawn inside it.
+    const s = this.scale.value;
+    State.mouseInIsland = { x: (x - rect.x) / s, y: (y - rect.y) / s };
 
     // Windows sends no cursor position with an OLE drag, so the drop sequence is
     // fed from the Win32 cursor poll instead — it runs throughout the drag.
@@ -653,9 +808,10 @@ export class Island {
 
   private isBotHit(x: number, y: number): boolean {
     const rect = this.islandRect();
-    const cx = rect.x + this.botCx.value;
-    const cy = rect.y + this.botCy.value;
-    const radius = this.botSize.value / 2;
+    const s = this.scale.value;
+    const cx = rect.x + this.botCx.value * s;
+    const cy = rect.y + this.botCy.value * s;
+    const radius = (this.botSize.value / 2) * s;
     return (x - cx) ** 2 + (y - cy) ** 2 <= radius * radius;
   }
 
@@ -722,6 +878,7 @@ export class Island {
     this.width.step(dt, nowMs);
     this.height.step(dt, nowMs);
     this.radius.step(dt, nowMs);
+    this.scale.step(dt, nowMs);
     this.applyGeometry();
 
     if (this.dirty) {
@@ -738,7 +895,8 @@ export class Island {
     if (greetingActive) {
       const gctx = this.greetingCanvas.getContext("2d");
       if (gctx) {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        this.sizeGreetingCanvas();
+        const dpr = this.greetingDpr;
         gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.greeting.draw(gctx);
       }
@@ -765,7 +923,8 @@ export class Island {
     // sweep — so a hidden island went on burning frames in exactly the states it
     // spends most of its life in. Geometry still has to finish retracting.
     const settling =
-      this.width.animating || this.height.animating || this.radius.animating;
+      this.width.animating || this.height.animating || this.radius.animating ||
+      this.scale.animating;
     const busy = State.mode === "hidden"
       ? settling
       : settling ||
@@ -816,9 +975,10 @@ export class Island {
     const size = this.botSize.value;
     const w = Math.max(1, Math.round(size));
     const hCss = w + BOT_OVERHANG;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    if (this.canvasPx !== w) {
+    const dpr = canvasDpr();
+    if (this.canvasPx !== w || this.canvasDprUsed !== dpr) {
       this.canvasPx = w;
+      this.canvasDprUsed = dpr;
       this.botCanvas.width = Math.round(w * dpr);
       this.botCanvas.height = Math.round(hCss * dpr);
       this.botCanvas.style.width = `${w}px`;
@@ -853,12 +1013,12 @@ export class Island {
   /** BotCanvasView.lookX / lookY — tanh of the distance to the bot. */
   private lookX(): number {
     const rect = this.islandRect();
-    const botScreenX = rect.x + this.botCx.value;
+    const botScreenX = rect.x + this.botCx.value * this.scale.value;
     return Math.tanh((State.mouse.x - botScreenX) / 260);
   }
 
   private lookY(): number {
-    return -Math.tanh((State.mouse.y - this.botCy.value) / 200);
+    return -Math.tanh((State.mouse.y - this.botCy.value * this.scale.value) / 200);
   }
 
   private updateCountdown(nowMs: number) {
@@ -922,6 +1082,7 @@ export class Island {
 
     syncMiniBotStates(State.tasks);
     this.engine.setState(State.effectiveState);
+    this.resize.sync();
   }
 
   /** Applies settings coming from Rust at boot. */
@@ -930,6 +1091,7 @@ export class Island {
     Sound.setVolume(State.settings.soundVolume);
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
     this.fsm.openOnHover = State.settings.openOnHover;
+    this.applyScaleSettings();
     State.notify();
   }
 

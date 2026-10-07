@@ -5,6 +5,7 @@
 // the file being sucked in. The island's own Mochi is hidden for the duration,
 // exactly as on macOS, because this canvas draws its own.
 
+import { canvasDpr } from "../core/scale";
 import { State } from "../core/state";
 import {
   USC, eIn, eInOut, eOut, lerp, progressAt,
@@ -102,7 +103,7 @@ export class UploadCanvas {
 
   /** `wallTime` in seconds drives the marching dashes, like the macOS timeline. */
   draw(f: UploadFrame, wallTime: number) {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = canvasDpr();
     if (this.sizedFor !== dpr) {
       this.sizedFor = dpr;
       this.canvas.width = Math.round(USC.W * dpr);

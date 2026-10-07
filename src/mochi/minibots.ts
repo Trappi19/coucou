@@ -2,6 +2,7 @@
 // Each canvas owns a BotEngine; the island's frame loop ticks every live one.
 
 import { BotEngine, hexToRGB } from "./engine";
+import { canvasDpr } from "../core/scale";
 import type { AgentTask } from "../core/state";
 
 interface MiniBot {
@@ -30,7 +31,7 @@ export function createMiniBot(task: AgentTask, bodySize: number): HTMLElement {
 
   const canvas = document.createElement("canvas");
   const engineSize = bodySize / 0.6;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = canvasDpr();
   canvas.width = Math.round(engineSize * dpr);
   canvas.height = Math.round(engineSize * dpr);
   canvas.style.width = `${engineSize}px`;
@@ -73,10 +74,11 @@ export function syncMiniBotStates(tasks: AgentTask[]) {
 }
 
 export function tickMiniBots(dt: number) {
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
   for (const mb of live.values()) {
     const ctx = mb.canvas.getContext("2d");
     if (!ctx) continue;
+    // Each canvas keeps the resolution it was created with.
+    const dpr = mb.canvas.width / mb.cssSize;
     mb.engine.update(dt);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, mb.cssSize, mb.cssSize);

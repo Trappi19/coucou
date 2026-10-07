@@ -34,6 +34,8 @@ export class IslandStateMachine {
   holdOpen: () => boolean = () => false;
   /** Compact opens when the cursor rests on it, no click needed. */
   openOnHover = false;
+  /** The island holds still (its size is being set): the mouse opens and folds nothing. */
+  private frozen = false;
 
   private homeCollapse: number | null = null;
   private greetCollapse: number | null = null;
@@ -46,7 +48,13 @@ export class IslandStateMachine {
     this.transition("coucou");
   }
 
+  freeze(on: boolean) {
+    this.frozen = on;
+    if (on) this.cancelTimers();
+  }
+
   mouseEntered() {
+    if (this.frozen) return;
     switch (this.state) {
       case "hidden":
         this.cancelTimers();
@@ -65,6 +73,7 @@ export class IslandStateMachine {
   }
 
   mouseLeft() {
+    if (this.frozen) return;
     switch (this.state) {
       case "hidden":
         break;
@@ -83,12 +92,12 @@ export class IslandStateMachine {
 
   /** The island opened while the mouse was elsewhere (an alert): leave time to read it. */
   openedUnattended() {
-    if (this.state !== "home") return;
+    if (this.frozen || this.state !== "home") return;
     this.scheduleHomeCollapse(Math.max(this.homeToPetitDelay, UNATTENDED_MIN_DELAY));
   }
 
   click() {
-    if (this.state !== "petit") return;
+    if (this.frozen || this.state !== "petit") return;
     this.cancelTimers();
     this.transition("home");
   }

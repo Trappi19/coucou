@@ -27,6 +27,8 @@ export interface ViewActions {
   setAutoClose(seconds: number): void;
   /** Flips one of the on/off island behaviours and saves it. */
   toggleSetting(key: "openOnHover" | "foldDuringChat"): void;
+  /** Resize mode: the island holds still while its size is set. */
+  startResize(): void;
   openSettingsWindow(): void;
   blip(): void;
 }
@@ -124,7 +126,9 @@ export function buildHeader(actions: ViewActions): ViewHost {
       gearBtn.append(svg(v === "settings" ? ICONS.gearFill : ICONS.gear, 14));
       clear(soundBtn);
       soundBtn.append(svg(State.settings.soundEnabled ? ICONS.speakerOn : ICONS.speakerOff, 14));
-      el.style.opacity = v === "confused" ? "0" : "1";
+      el.style.opacity = v === "confused" ? "0" : State.resizing ? "0.3" : "1";
+      // Nothing to navigate to until the size is validated or cancelled.
+      el.style.pointerEvents = State.resizing ? "none" : "";
     },
   };
 }
@@ -468,6 +472,13 @@ function buildSettings(actions: ViewActions): ViewHost {
       h("button", {
         class: "link-btn",
         style: "color:#8e939c;font-size:11.5px",
+        text: "Size…",
+        title: "Make the island bigger or smaller",
+        onclick: () => actions.startResize(),
+      }),
+      h("button", {
+        class: "link-btn",
+        style: "color:#8e939c;font-size:11.5px",
         text: "Settings…",
         onclick: () => actions.openSettingsWindow(),
       }),
@@ -503,6 +514,18 @@ function buildSettings(actions: ViewActions): ViewHost {
   };
 }
 
+// ── Resize ────────────────────────────────────────────────────────────────────
+
+function buildResize(): ViewHost {
+  const body = h(
+    "div",
+    { class: "stack", style: "padding:0 18px 0 128px" },
+    h("div", { class: "title", text: "Drag an edge to resize Mochi." }),
+    h("div", { class: "sub", text: "Both sides move together, so it stays centred. ✓ to keep it." }),
+  );
+  return { el: h("div", { class: "view" }, card("indigo", body)), sync() {} };
+}
+
 // ── Placeholders filled in later stages ───────────────────────────────────────
 
 function buildPlaceholder(title: string, sub: string): ViewHost {
@@ -531,6 +554,7 @@ export function buildViews(
   map.set("confused", buildConfused());
   map.set("note", buildNote());
   map.set("settings", buildSettings(actions));
+  map.set("resize", buildResize());
   map.set("prompt", buildPrompt(actions, onChatHeightChange));
   map.set("sessions", buildSessions(actions));
   map.set("upload", buildUpload());

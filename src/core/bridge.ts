@@ -38,6 +38,11 @@ export const Bridge = {
   /** Shrink the window down to the invisible wake strip (hidden) or back to full. */
   setCollapsed: (collapsed: boolean) => call<void>("set_collapsed", { collapsed }),
 
+  /** Sizes the panel for the island scale (the largest one in use). */
+  setPanelScale: (scale: number) => call<void>("set_panel_scale", { scale }),
+  /** Settings window → the island goes into its resize mode. */
+  startIslandResize: () => call<void>("start_island_resize"),
+
   /**
    * Pushes the island shape in window coordinates. Rust flips click-through from
    * its own cursor poll, so the flag is never a frame behind a click.

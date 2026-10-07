@@ -100,6 +100,26 @@ fn set_collapsed(app: AppHandle, shared: State<Shared>, collapsed: bool) {
     shared.gate.set_active(!collapsed);
 }
 
+/// Sizes the panel for the island scale the user picked (or the largest one
+/// while they are resizing it), so a bigger island is never cut off.
+#[tauri::command]
+fn set_panel_scale(app: AppHandle, shared: State<Shared>, scale: f64) {
+    let scale = if scale.is_finite() { scale.clamp(0.5, 2.0) } else { 1.0 };
+    *shared.gate.scale.lock().unwrap() = scale;
+    let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
+    if !collapsed {
+        let pref = shared.settings.lock().unwrap().screen.clone();
+        island::apply_geometry(&app, &pref, false);
+        island::refresh_click_through(&app, &shared.gate);
+    }
+}
+
+/// Settings window → "Adjust size…": the island goes into its resize mode.
+#[tauri::command]
+fn start_island_resize(app: AppHandle) {
+    let _ = app.emit_to(island::WINDOW_LABEL, "tray", "resize".to_string());
+}
+
 /// The front end pushes the island shape; Rust decides click-through from it.
 #[tauri::command]
 fn set_island_rect(app: AppHandle, shared: State<Shared>, x: f64, y: f64, width: f64, height: f64) {
@@ -435,6 +455,8 @@ pub fn run() {
             boot,
             save_settings,
             set_collapsed,
+            set_panel_scale,
+            start_island_resize,
             set_island_rect,
             focus_window,
             reposition,

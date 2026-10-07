@@ -66,6 +66,10 @@ async function main() {
         setPaused(false);
         island.alert(State.defaultView());
         break;
+      case "resize":
+        setPaused(false);
+        island.startResize();
+        break;
       case "pause":
         setPaused(!State.paused);
         if (State.paused) island.fsm.forceHidden();

@@ -119,6 +119,9 @@ export interface Settings {
   openOnHover: boolean;
   /** An open conversation folds like any other view instead of waiting for ⌃ / Esc. */
   foldDuringChat: boolean;
+  /** Island zoom picked by the user (1 = original size), compact and open separately. */
+  compactScale: number;
+  expandedScale: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -137,6 +140,8 @@ export const DEFAULT_SETTINGS: Settings = {
   cliModel: "",
   openOnHover: false,
   foldDuringChat: false,
+  compactScale: 1,
+  expandedScale: 1,
 };
 
 type Listener = () => void;
@@ -180,6 +185,13 @@ class AppState {
   /** Whoever answers the chat is set up (Claude Code found, or an API key saved). */
   chatReady: boolean | null = null;
   pendingApproval: ApprovalInfo | null = null;
+
+  /** Resize mode: the island holds still while the user sets its size. */
+  resizing = false;
+  /** Which of the two sizes is being set. */
+  resizeTarget: "compact" | "expanded" = "expanded";
+  /** Sizes being tried; only saved on ✓. */
+  resizeScales = { compact: 1, expanded: 1 };
 
   integrations: Record<string, IntegrationInfo> = {};
 

@@ -22,6 +22,7 @@ export type IslandViewName =
   | "result"
   | "note"
   | "settings"
+  | "resize"
   | "greeting";
 
 export type BotStateName =
@@ -89,6 +90,8 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   note: { height: 160, botX: 60, botY: null, botDiameter: 50, agentMode: "column" },
   // Taller than macOS: one more row, for the hover and chat-folding switches.
   settings: { height: 190, botX: 54, botY: null, botDiameter: 46, agentMode: "none" },
+  // The island while its size is being set: Mochi and a line of help.
+  resize: { height: 160, botX: 70, botY: null, botDiameter: 62, agentMode: "none" },
   greeting: { height: 150, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
 };
 

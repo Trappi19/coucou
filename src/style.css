@@ -74,7 +74,165 @@ body {
   background: #000;
   border-radius: 0 0 14px 14px;
   overflow: visible;
-  will-change: width, height, transform;
+  /* The user's size is a scale from the top centre: it grows the same on both
+     sides and never leaves the top edge. No will-change on transform: it would
+     freeze the text at its unscaled raster and blur it once enlarged. */
+  transform-origin: 50% 0;
+  will-change: width, height;
+}
+
+/* ── Resize mode ────────────────────────────────────────────────────────── */
+
+.rs-handle {
+  position: absolute;
+  display: none;
+  z-index: 5;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.45);
+  transition: background 0.15s, transform 0.15s;
+}
+
+/* A wider invisible grip than the visible bar. */
+.rs-handle::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+}
+
+.rs-handle.on {
+  display: block;
+}
+
+.rs-handle:hover,
+.rs-handle.dragging {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.rs-handle.left,
+.rs-handle.right {
+  top: 50%;
+  width: 5px;
+  height: 60%;
+  max-height: 34px;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.rs-handle.left {
+  left: -10px;
+}
+
+.rs-handle.right {
+  right: -10px;
+}
+
+.rs-handle.bottom {
+  bottom: -10px;
+  left: 50%;
+  width: 40px;
+  height: 5px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+#resize-bar {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 5px 5px 6px;
+  border-radius: 999px;
+  background: #000;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+}
+
+#resize-bar.on {
+  display: flex;
+  animation: rs-pop 0.35s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+@keyframes rs-pop {
+  from { opacity: 0; transform: translateX(-50%) scale(0.85); }
+  to { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+.rs-seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.rs-seg button {
+  font: 500 11.5px var(--font);
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dim-2);
+  cursor: default;
+  transition: background 0.15s, color 0.15s;
+}
+
+.rs-seg button.on {
+  background: var(--tab-on);
+  color: var(--ink);
+}
+
+.rs-pct {
+  min-width: 46px;
+  text-align: center;
+  font: 600 12px var(--font);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.rs-reset {
+  font: 500 11.5px var(--font);
+  padding: 5px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--ink-2);
+  cursor: default;
+}
+
+.rs-reset:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.rs-icon {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: default;
+  transition: transform 0.08s ease-out, filter 0.15s;
+}
+
+.rs-icon:active {
+  transform: scale(0.92);
+}
+
+.rs-icon.cancel {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--dim-2);
+}
+
+.rs-icon.ok {
+  background: var(--green);
+  color: #06210f;
+}
+
+.rs-icon.ok:hover {
+  filter: brightness(1.1);
 }
 
 #island-clip {

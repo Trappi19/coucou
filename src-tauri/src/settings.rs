@@ -34,6 +34,15 @@ pub struct Settings {
     /// instead of staying up until it is folded by hand.
     #[serde(default)]
     pub fold_during_chat: bool,
+    /// Island zoom picked by the user, compact and open separately. 1 = original size.
+    #[serde(default = "default_scale")]
+    pub compact_scale: f64,
+    #[serde(default = "default_scale")]
+    pub expanded_scale: f64,
+}
+
+fn default_scale() -> f64 {
+    1.0
 }
 
 pub const BACKEND_CLAUDE_CODE: &str = "claudeCode";
@@ -68,6 +77,8 @@ impl Default for Settings {
             cli_model: String::new(),
             open_on_hover: false,
             fold_during_chat: false,
+            compact_scale: default_scale(),
+            expanded_scale: default_scale(),
         }
     }
 }

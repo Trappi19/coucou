@@ -59,6 +59,8 @@ pub struct PollGate {
     cv: Condvar,
     pub collapsed: AtomicBool,
     pub rect: Mutex<IslandRect>,
+    /// The panel grows with the island size the user picked (1 = 720×320).
+    pub scale: Mutex<f64>,
     /// Mirrors the window flag so we only call into the OS when it changes.
     ignoring: AtomicBool,
 }
@@ -70,6 +72,7 @@ impl PollGate {
             cv: Condvar::new(),
             collapsed: AtomicBool::new(true),
             rect: Mutex::new(IslandRect::default()),
+            scale: Mutex::new(1.0),
             ignoring: AtomicBool::new(false),
         }
     }
@@ -157,7 +160,15 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
     let mp = *m.position();
     let ms = *m.size();
 
-    let (lw, lh) = if collapsed { (STRIP_W, STRIP_H) } else { (PANEL_W, PANEL_H) };
+    let panel_scale = app
+        .try_state::<crate::Shared>()
+        .map(|s| *s.gate.scale.lock().unwrap())
+        .unwrap_or(1.0);
+    let (lw, lh) = if collapsed {
+        (STRIP_W, STRIP_H)
+    } else {
+        (PANEL_W * panel_scale, PANEL_H * panel_scale)
+    };
     let pw = (lw * scale).round().max(1.0) as u32;
     let ph = (lh * scale).round().max(1.0) as u32;
     let x = mp.x + (ms.width as i32 - pw as i32) / 2;
