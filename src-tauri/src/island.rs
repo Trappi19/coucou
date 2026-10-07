@@ -229,7 +229,14 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                     Ok(s) => (s.width as f64 / scale, s.height as f64 / scale),
                     Err(_) => (PANEL_W, PANEL_H),
                 };
-                if (x - last.0).abs() < 1.0 && (y - last.1).abs() < 1.0 {
+
+                // Read before the "cursor hasn't moved" shortcut below: a click
+                // made without moving the mouse must still be seen.
+                let down = left_button_down();
+                let pressed = down && !was_down;
+                was_down = down;
+
+                if !pressed && (x - last.0).abs() < 1.0 && (y - last.1).abs() < 1.0 {
                     continue;
                 }
                 last = (x, y);
@@ -244,6 +251,12 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                     && y >= r.y - HIT_MARGIN
                     && y <= r.y + r.h + HIT_MARGIN;
 
+                // A click anywhere else on screen: the island folds back to
+                // compact unless it is in use (the page decides).
+                if pressed && !on_island {
+                    let _ = win.emit("outside-click", ());
+                }
+
                 // A file being dragged has to be able to find us. WS_EX_TRANSPARENT
                 // — what click-through is on Windows — hides the window from
                 // WindowFromPoint, so OLE finds no drop target and shows the "no
@@ -253,12 +266,10 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 // the mouse, which also makes the drop zone as forgiving as the Mac's.
                 // A press may be the start of a drag: make sure the drop target is
                 // ours before the file arrives.
-                let down = left_button_down();
-                if down && !was_down {
+                if pressed {
                     let handle = app.clone();
                     let _ = app.run_on_main_thread(move || platform::unblock_webview_drops(&handle));
                 }
-                was_down = down;
 
                 let dragging = down
                     && x >= 0.0

@@ -1,6 +1,7 @@
 // Coucou for Windows — app wiring and the commands the island calls.
 
 mod claude;
+mod claude_code;
 mod files;
 mod hooks;
 mod integrations;
@@ -21,6 +22,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder
 use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
 
 use claude::{Chat, ChatContext, ChatReply};
+use claude_code::CliChat;
 use files::DroppedFile;
 use hooks::{HookPreview, HookStatus};
 use island::{PollGate, ScreenInfo};
@@ -233,21 +235,75 @@ fn approval_decline(app: AppHandle, request_id: String) {
 
 // ── Chat, files and secrets ───────────────────────────────────────────────────
 
-/// One chat turn. The API key and any file bytes stay on the Rust side.
+/// One chat turn, answered by Claude Code (the user's subscription) or the API.
+/// The API key and any file bytes stay on the Rust side.
 #[tauri::command]
 async fn chat_send(
+    app: AppHandle,
     shared: State<'_, Shared>,
     chat: State<'_, Chat>,
     query: String,
     context: Option<ChatContext>,
 ) -> Result<ChatReply, String> {
-    let model = shared.settings.lock().unwrap().model.clone();
-    claude::send(&chat, &model, query, context).await
+    let (backend, model, cli_model) = {
+        let s = shared.settings.lock().unwrap();
+        (s.chat_backend.clone(), s.model.clone(), s.cli_model.clone())
+    };
+    if backend == settings::BACKEND_API {
+        claude::send(&chat, &model, query, context).await
+    } else {
+        claude_code::send(app, cli_model, query, context).await
+    }
+}
+
+/// New conversation. With Claude Code it stays in the current project.
+#[tauri::command]
+fn chat_reset(chat: State<Chat>, cli: State<CliChat>) {
+    chat.reset();
+    cli.reset();
+}
+
+/// The Stop button: ends the Claude Code turn in flight.
+#[tauri::command]
+fn chat_cancel(cli: State<CliChat>) {
+    cli.cancel();
 }
 
 #[tauri::command]
-fn chat_reset(chat: State<Chat>) {
-    chat.reset();
+async fn chat_projects() -> Result<Vec<claude_code::Project>, String> {
+    tauri::async_runtime::spawn_blocking(claude_code::list_projects)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn chat_sessions(path: String) -> Result<Vec<claude_code::SessionInfo>, String> {
+    tauri::async_runtime::spawn_blocking(move || claude_code::list_sessions(std::path::Path::new(&path)))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Switches the chat to a project, and to one of its conversations or a new one.
+/// Returns that conversation's messages.
+#[tauri::command]
+async fn chat_open(
+    app: AppHandle,
+    path: String,
+    session_id: Option<String>,
+) -> Result<Vec<claude_code::HistoryMessage>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let cli = app.state::<CliChat>();
+        claude_code::open(&cli, &path, session_id.as_deref())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn claude_code_status() -> Result<claude_code::CliStatus, String> {
+    tauri::async_runtime::spawn_blocking(claude_code::status)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Copies a dropped file into the inbox and reports its name back.
@@ -374,6 +430,7 @@ pub fn run() {
         })
         .manage(Pending::default())
         .manage(Chat::default())
+        .manage(CliChat::default())
         .invoke_handler(tauri::generate_handler![
             boot,
             save_settings,
@@ -393,6 +450,11 @@ pub fn run() {
             log_line,
             chat_send,
             chat_reset,
+            chat_cancel,
+            chat_projects,
+            chat_sessions,
+            chat_open,
+            claude_code_status,
             ingest_file,
             secret_present,
             secret_set,

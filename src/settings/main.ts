@@ -3,8 +3,8 @@
 // integrations land here too in a later stage.
 
 import "./settings.css";
-import { Bridge, onEvent, type HookStatus } from "../core/bridge";
-import { DEFAULT_SETTINGS, type Settings } from "../core/state";
+import { Bridge, onEvent, type ClaudeCodeStatus, type HookStatus } from "../core/bridge";
+import { DEFAULT_SETTINGS, type ChatBackend, type Settings } from "../core/state";
 import { h, clear } from "../views/dom";
 
 let settings: Settings = { ...DEFAULT_SETTINGS };
@@ -171,7 +171,7 @@ function claudeSection(status: HookStatus): HTMLElement {
   return section;
 }
 
-// ── Claude API section ────────────────────────────────────────────────────────
+// ── Chat section ──────────────────────────────────────────────────────────────
 
 const MODELS: [string, string][] = [
   ["claude-opus-5", "Claude Opus 5"],
@@ -179,8 +179,88 @@ const MODELS: [string, string][] = [
   ["claude-haiku-4-5", "Claude Haiku 4.5"],
 ];
 
-function apiSection(hasKey: boolean): HTMLElement {
-  const dot = statusDot(hasKey);
+/** Claude Code aliases: always the latest model of each family. */
+const CLI_MODELS: [string, string][] = [
+  ["", "Your plan's default"],
+  ["fable", "Fable"],
+  ["opus", "Opus"],
+  ["sonnet", "Sonnet"],
+  ["haiku", "Haiku"],
+];
+
+/** Who answers Mochi's chat: the Claude subscription (through Claude Code) or an API key. */
+function chatSection(status: ClaudeCodeStatus | null, hasKey: boolean): HTMLElement {
+  const dot = statusDot(false);
+  const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
+  const pick = h("select", {}) as HTMLSelectElement;
+  pick.append(
+    h("option", { value: "claudeCode", text: "My Claude subscription (Claude Code)" }),
+    h("option", { value: "api", text: "An Anthropic API key" }),
+  );
+  pick.value = settings.chatBackend;
+  pick.addEventListener("change", () => {
+    settings.chatBackend = pick.value as ChatBackend;
+    void save();
+    draw();
+  });
+
+  function draw() {
+    clear(body);
+    if (settings.chatBackend === "api") {
+      body.append(apiRows(hasKey, (ok) => (dot.style.background = ok ? "#22c55e" : "#f4505e")));
+      return;
+    }
+    const ready = (status?.found ?? false) && (status?.loggedIn ?? false);
+    dot.style.background = ready ? "#22c55e" : "#f4505e";
+    body.append(h("div", {
+      class: "hint",
+      text: "Mochi runs Claude Code in the background with your own login, so the chat uses your Pro or Max plan — no API key. It can read files and search the web, never edit anything or run commands. Usage counts toward your plan's limits.",
+    }));
+    if (!status?.found) {
+      body.append(h("div", {
+        class: "notice warn",
+        text: "Claude Code wasn't found. Install it (claude.com/code) or the Claude desktop app, then reopen this window.",
+      }));
+    } else {
+      body.append(h("div", { class: "row" },
+        h("label", { text: "Claude Code" }),
+        h("span", { class: "path", text: status.version ? `${status.version} — ${status.path}` : status.path ?? "" }),
+      ));
+      if (!status.loggedIn) {
+        body.append(h("div", {
+          class: "notice warn",
+          text: "Claude Code isn't signed in (or the login expired). Open a terminal, run `claude`, type /login and sign in with your Claude account. The Claude desktop app keeps its own login, so this is needed once even if you use it.",
+        }));
+      }
+    }
+    const model = h("select", {}) as HTMLSelectElement;
+    for (const [id, label] of CLI_MODELS) model.append(h("option", { value: id, text: label }));
+    model.value = CLI_MODELS.some(([id]) => id === settings.cliModel) ? settings.cliModel : "";
+    model.addEventListener("change", () => {
+      settings.cliModel = model.value;
+      void save();
+    });
+    body.append(
+      h("div", { class: "row" }, h("label", { text: "Model" }), model),
+      h("div", {
+        class: "hint",
+        text: "Conversations are saved by Claude Code. Without a project picked they go to “Discussion”; pick a project or an old conversation from the clock tab in the island.",
+      }),
+    );
+  }
+
+  draw();
+  return h(
+    "section",
+    {},
+    h("h2", {}, dot, h("span", { text: "Mochi's chat" })),
+    h("div", { class: "row" }, h("label", { text: "Answer with" }), pick),
+    body,
+  );
+}
+
+function apiRows(hasKey: boolean, onKey: (present: boolean) => void): HTMLElement {
+  onKey(hasKey);
   const state = h("span", { class: "hint", text: hasKey ? "Key saved in the Windows Credential Manager." : "No key yet — the chat needs one." });
 
   const field = h("input", {
@@ -197,7 +277,7 @@ function apiSection(hasKey: boolean): HTMLElement {
 
   async function refresh() {
     const present = (await Bridge.secretPresent("anthropic-api-key")) ?? false;
-    dot.style.background = present ? "#22c55e" : "#f4505e";
+    onKey(present);
     state.textContent = present
       ? "Key saved in the Windows Credential Manager."
       : "No key yet — the chat needs one.";
@@ -242,11 +322,12 @@ function apiSection(hasKey: boolean): HTMLElement {
   });
 
   clearBtn.style.display = hasKey ? "" : "none";
+  // Redrawn when the backend is switched back: the key may have changed since boot.
+  void refresh();
 
   return h(
-    "section",
-    {},
-    h("h2", {}, dot, h("span", { text: "Claude" })),
+    "div",
+    { style: "display:flex;flex-direction:column;gap:12px" },
     state,
     h("div", { class: "row" }, h("label", { text: "API key" }), field, saveBtn, clearBtn),
     h("div", { class: "row" }, h("label", { text: "Model" }), model),
@@ -371,12 +452,15 @@ function generalSection(): HTMLElement {
   });
 
   const autoClose = h("input", {
-    type: "number", min: "5", max: "120", step: "1",
+    type: "number", min: "0", max: "120", step: "1",
     value: String(Math.round(settings.autoCloseInterval)),
     style: "width:72px",
   }) as HTMLInputElement;
   autoClose.addEventListener("change", () => {
-    settings.autoCloseInterval = Math.max(5, Math.min(120, Number(autoClose.value) || 15));
+    // 0 is a real choice (fold the moment the mouse leaves), so only junk falls back to 15.
+    const n = Number(autoClose.value);
+    settings.autoCloseInterval =
+      autoClose.value.trim() === "" || !Number.isFinite(n) ? 15 : Math.max(0, Math.min(120, Math.round(n)));
     autoClose.value = String(settings.autoCloseInterval);
     void save();
   });
@@ -404,7 +488,17 @@ function generalSection(): HTMLElement {
     h("div", { class: "row" },
       h("label", { text: "Auto-close" }),
       autoClose,
-      h("span", { class: "hint", text: "seconds after you leave the island" }),
+      h("span", { class: "hint", text: "seconds after you leave the island (0 = straight away). A click elsewhere folds it too." }),
+    ),
+    h("div", { class: "row" },
+      h("label", { text: "Open on hover" }),
+      toggle(settings.openOnHover, (v) => { settings.openOnHover = v; void save(); }),
+      h("span", { class: "hint", text: "rest the cursor on Mochi to open it, no click needed" }),
+    ),
+    h("div", { class: "row" },
+      h("label", { text: "Fold during chats" }),
+      toggle(settings.foldDuringChat, (v) => { settings.foldDuringChat = v; void save(); }),
+      h("span", { class: "hint", text: "an open conversation folds too; otherwise it stays until ⌃ or Esc" }),
     ),
     h("div", { class: "row" },
       h("label", { text: "Island lives on" }),
@@ -430,6 +524,7 @@ async function main() {
   };
 
   const hasKey = (await Bridge.secretPresent("anthropic-api-key")) ?? false;
+  const cli = await Bridge.claudeCodeStatus();
 
   const keys = [
     "stripe-api-key", "github-token", "vercel-token",
@@ -442,7 +537,7 @@ async function main() {
   root.append(
     h("h1", {}, h("span", { text: "Coucou" }), h("span", { class: "version", text: version })),
     claudeSection(status),
-    apiSection(hasKey),
+    chatSection(cli, hasKey),
     integrationsSection(present),
     generalSection(),
     h("div", {

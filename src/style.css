@@ -60,7 +60,9 @@ body {
   transform: translateX(-50%);
   width: 240px;
   height: 6px;
-  background: transparent;
+  /* Not fully transparent: a pixel with zero alpha may let the mouse through,
+     and then nothing could ever wake the island. Still invisible. */
+  background: rgba(0, 0, 0, 0.01);
 }
 
 /* ── Island ─────────────────────────────────────────────────────────────── */
@@ -827,6 +829,255 @@ input[type="range"]::-webkit-slider-thumb {
   white-space: pre-wrap;
   padding-right: 8px;
   user-select: text;
+}
+
+.reply.err {
+  color: var(--red-text);
+}
+
+/* Project and conversation above the messages. */
+.chat-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  min-width: 0;
+}
+
+.proj-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  padding: 3px 9px 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-2);
+  font: 500 11.5px var(--font);
+  cursor: default;
+  flex: 0 0 auto;
+  transition: background 0.12s;
+}
+
+.proj-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.proj-btn svg {
+  color: var(--dim-2);
+  flex: 0 0 auto;
+}
+
+.proj-dot {
+  display: grid;
+  place-items: center;
+}
+
+.proj-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-title {
+  font: 400 11.5px var(--font);
+  color: var(--dim-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.chat-icon-btn {
+  width: 24px;
+  height: 22px;
+  flex: 0 0 24px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--dim-2);
+  display: grid;
+  place-items: center;
+  cursor: default;
+}
+
+.chat-icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ink);
+}
+
+.chat-icon-btn:disabled {
+  opacity: 0.35;
+}
+
+.typing-row {
+  align-items: center;
+  gap: 8px;
+}
+
+.typing-label {
+  font: 400 11.5px var(--font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Projects and conversations ─────────────────────────────────────────── */
+
+.sess-body {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px 12px 84px;
+}
+
+.sess-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sess-col.left {
+  flex: 0 0 168px;
+}
+
+.sess-col.right {
+  flex: 1 1 auto;
+}
+
+.sess-label {
+  font: 600 10.5px var(--font);
+  color: var(--dim-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 8px 2px;
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+}
+
+.sess-projects,
+.sess-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.sess-proj,
+.sess-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: default;
+  flex: 0 0 auto;
+  transition: background 0.12s;
+}
+
+.sess-proj:hover,
+.sess-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sess-proj.on,
+.sess-row.on {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sess-proj .n {
+  font: 500 12px var(--font);
+  color: #c5c8cd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.sess-proj.on .n {
+  color: var(--ink);
+}
+
+.sess-proj .c {
+  margin-left: auto;
+  font: 400 10.5px var(--font);
+  color: var(--dim-4);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.sess-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 22px;
+  padding: 0 0 0 8px;
+}
+
+.sess-head .n {
+  font: 600 12.5px var(--font);
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.btn.sess-new {
+  font-size: 11.5px;
+  padding: 4px 10px;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.btn.sess-new:disabled {
+  opacity: 0.4;
+}
+
+.sess-row .t {
+  font: 400 12px var(--font);
+  color: #c5c8cd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.sess-row.on .t {
+  color: var(--ink);
+}
+
+.sess-row .a {
+  margin-left: auto;
+  font: 400 10.5px var(--font);
+  color: var(--dim-4);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.sess-empty {
+  font: 400 11.5px var(--font);
+  color: var(--dim-3);
+  padding: 6px 8px;
+}
+
+.sess-empty.err {
+  color: var(--red-text);
 }
 
 .typing {

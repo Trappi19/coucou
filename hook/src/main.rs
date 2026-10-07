@@ -36,7 +36,16 @@ const MAX_FIELD_LEN: usize = 2_000;
 mod win;
 use win::connect;
 
+/// Set by Coucou when Mochi's chat runs Claude Code: those turns are Mochi
+/// talking, not a session to show on the island.
+const SILENCE_VAR: &str = "COUCOU_MOCHI_CHAT";
+
 fn main() {
+    if std::env::var_os(SILENCE_VAR).is_some() {
+        // Drain stdin so Claude Code never sees a broken pipe.
+        let _ = std::io::copy(&mut std::io::stdin(), &mut std::io::sink());
+        std::process::exit(0);
+    }
     let Some((payload, event)) = read_event() else { std::process::exit(0) };
 
     let waits_for_answer = event == "PermissionRequest";

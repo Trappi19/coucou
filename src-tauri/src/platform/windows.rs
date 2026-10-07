@@ -102,6 +102,47 @@ pub fn find_on_path(stem: &str) -> Option<PathBuf> {
     None
 }
 
+/// Where `claude.exe` lives when it isn't on %PATH%, best first: the native
+/// installer's ~\.local\bin, then the copy Claude Desktop ships under
+/// Claude\claude-code\<version>\<build>\, newest version first.
+///
+/// Claude Desktop from the Microsoft Store is an MSIX package: what it writes to
+/// %APPDATA% really lands in %LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming,
+/// and only the package itself sees it at the %APPDATA% path. Coucou is not
+/// that package, so both places are searched.
+pub fn claude_cli_candidates() -> Vec<PathBuf> {
+    let mut out = vec![super::home_dir().join(".local").join("bin").join("claude.exe")];
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        roots.push(PathBuf::from(appdata).join("Claude").join("claude-code"));
+    }
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        if let Ok(packages) = std::fs::read_dir(PathBuf::from(local).join("Packages")) {
+            for package in packages.flatten() {
+                if package.file_name().to_string_lossy().starts_with("Claude_") {
+                    roots.push(package.path().join("LocalCache").join("Roaming").join("Claude").join("claude-code"));
+                }
+            }
+        }
+    }
+    let mut bundled: Vec<(Vec<u32>, PathBuf)> = Vec::new();
+    for version in roots.iter().filter_map(|r| std::fs::read_dir(r).ok()).flat_map(|d| d.flatten()) {
+        let key: Vec<u32> = version
+            .file_name()
+            .to_string_lossy()
+            .split('.')
+            .map(|n| n.parse().unwrap_or(0))
+            .collect();
+        let Ok(builds) = std::fs::read_dir(version.path()) else { continue };
+        for build in builds.flatten() {
+            bundled.push((key.clone(), build.path().join("claude.exe")));
+        }
+    }
+    bundled.sort_by(|a, b| b.0.cmp(&a.0));
+    out.extend(bundled.into_iter().map(|(_, p)| p));
+    out
+}
+
 // ── Who we are ────────────────────────────────────────────────────────────────
 //
 // Named pipes share one machine-wide namespace, so the SID in the name is what

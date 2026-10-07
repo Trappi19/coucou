@@ -17,6 +17,7 @@ export type IslandViewName =
   | "choose"
   | "mail"
   | "prompt"
+  | "sessions"
   | "searching"
   | "result"
   | "note"
@@ -81,10 +82,13 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   choose: { height: 176, botX: 60, botY: 101, botDiameter: 52, agentMode: "column" },
   mail: { height: 240, botX: 56, botY: null, botDiameter: 46, agentMode: "column" },
   prompt: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
+  // Projects and conversations to pick from. Same left column for Mochi as the chat.
+  sessions: { height: 270, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
   searching: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
   result: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
   note: { height: 160, botX: 60, botY: null, botDiameter: 50, agentMode: "column" },
-  settings: { height: 160, botX: 54, botY: null, botDiameter: 46, agentMode: "none" },
+  // Taller than macOS: one more row, for the hover and chat-folding switches.
+  settings: { height: 190, botX: 54, botY: null, botDiameter: 46, agentMode: "none" },
   greeting: { height: 150, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
 };
 

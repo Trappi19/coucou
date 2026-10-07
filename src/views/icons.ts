@@ -36,6 +36,18 @@ export const ICONS = {
   star: "M12 3.2l2.6 5.55 5.9.82-4.3 4.3 1.05 6.13L12 17.1l-5.25 2.9L7.8 13.87 3.5 9.57l5.9-.82L12 3.2z",
   // square.stack.fill
   stack: "M5 8h14v11.5H5V8zm1.8-3h10.4v1.6H6.8V5zm1.6-2.6h7.2V4H8.4V2.4z",
+  // clock (conversation history)
+  clock: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 1.9a7.1 7.1 0 1 1 0 14.2 7.1 7.1 0 0 1 0-14.2zM11 7v5.55l4.15 2.5.95-1.6-3.25-1.95V7H11z",
+  // folder.fill
+  folder: "M3 6.6A1.6 1.6 0 0 1 4.6 5h4.6l2 2.1h8.2A1.6 1.6 0 0 1 21 8.7v8.7a1.6 1.6 0 0 1-1.6 1.6H4.6A1.6 1.6 0 0 1 3 17.4V6.6z",
+  // square.and.pencil (new conversation)
+  compose: "M4 6.2A2.2 2.2 0 0 1 6.2 4H12v1.9H6.2a.3.3 0 0 0-.3.3v11.6c0 .17.13.3.3.3h11.6a.3.3 0 0 0 .3-.3V12H20v5.8A2.2 2.2 0 0 1 17.8 20H6.2A2.2 2.2 0 0 1 4 17.8V6.2zm13.4-3 3.4 3.4-8.1 8.1-3.9.5.5-3.9 8.1-8.1z",
+  // stop.fill
+  stop: "M7 7h10v10H7z",
+  // chevron.up (fold the island)
+  chevronUp: "M5.5 15 12 8.5 18.5 15",
+  // chevron.down
+  chevronDown: "M5.5 9 12 15.5 18.5 9",
   // doc.text
   doc: "M6.5 2.6h7l4 4v14.8h-11V2.6zm6.6 1.6v3.3h3.3l-3.3-3.3zM8.6 11h6.8v1.5H8.6V11zm0 3.4h6.8v1.5H8.6v-1.5z",
 } as const;

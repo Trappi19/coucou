@@ -30,9 +30,28 @@ export interface ApprovalInfo {
 
 export interface ChatMessage {
   id: number;
-  role: "user" | "assistant";
+  /** "error" is shown in the conversation but never sent anywhere. */
+  role: "user" | "assistant" | "error";
   content: string;
 }
+
+/** A folder Claude Code has worked in. Discussion is Mochi's own default. */
+export interface ChatProject {
+  name: string;
+  path: string;
+  isDefault: boolean;
+  /** Last activity, ms since the epoch (0 = never). */
+  updated: number;
+  sessions: number;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  updated: number;
+}
+
+export type ChatBackend = "claudeCode" | "api";
 
 export type PromptContext =
   | { kind: "window"; appName: string; title: string; url?: string }
@@ -90,8 +109,16 @@ export interface Settings {
   screen: "primary" | "cursor";
   autostart: boolean;
   hooksInstalled: boolean;
-  /** Claude model used by the chat. */
+  /** Claude model used by the chat with an API key. */
   model: string;
+  /** Who answers the chat: the Claude subscription through Claude Code, or an API key. */
+  chatBackend: ChatBackend;
+  /** Claude Code model alias; empty = the account's default. */
+  cliModel: string;
+  /** Compact opens when the cursor rests on it, no click needed. */
+  openOnHover: boolean;
+  /** An open conversation folds like any other view instead of waiting for ⌃ / Esc. */
+  foldDuringChat: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -106,6 +133,10 @@ export const DEFAULT_SETTINGS: Settings = {
   autostart: false,
   hooksInstalled: false,
   model: "claude-opus-5",
+  chatBackend: "claudeCode",
+  cliModel: "",
+  openOnHover: false,
+  foldDuringChat: false,
 };
 
 type Listener = () => void;
@@ -136,6 +167,18 @@ class AppState {
   noteMessage: string | null = null;
   searchResult: SearchResult | null = null;
   chatHistory: ChatMessage[] = [];
+  /** Project the chat runs in (Claude Code). null = Discussion, the default. */
+  chatProject: ChatProject | null = null;
+  chatSessionId: string | null = null;
+  chatTitle: string | null = null;
+  /** A reply is on its way. */
+  chatPending = false;
+  /** What Claude Code is doing right now ("Searching the web…"). */
+  chatActivity: string | null = null;
+  /** Unsent text in the chat field. */
+  chatDraft = "";
+  /** Whoever answers the chat is set up (Claude Code found, or an API key saved). */
+  chatReady: boolean | null = null;
   pendingApproval: ApprovalInfo | null = null;
 
   integrations: Record<string, IntegrationInfo> = {};
@@ -261,6 +304,20 @@ class AppState {
       this.settings.activeIntegrations = [...active, id];
     }
     this.loadIntegrationTasks();
+  }
+
+  get usesClaudeCode(): boolean {
+    return this.settings.chatBackend !== "api";
+  }
+
+  /** Empties the conversation on screen. The backend is reset separately (Bridge.chatReset). */
+  clearChat() {
+    this.chatHistory = [];
+    this.chatSessionId = null;
+    this.chatTitle = null;
+    this.chatActivity = null;
+    this.droppedFile = null;
+    this.promptContext = null;
   }
 
   defaultView(): IslandViewName {

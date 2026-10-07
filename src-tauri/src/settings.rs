@@ -20,10 +20,31 @@ pub struct Settings {
     /// Defaulted explicitly so a settings.json written by an older build still loads.
     #[serde(default = "default_model")]
     pub model: String,
+    /// Who answers the chat: `BACKEND_CLAUDE_CODE` (the user's own Claude
+    /// subscription, through the Claude Code CLI) or `BACKEND_API` (an API key).
+    #[serde(default = "default_backend")]
+    pub chat_backend: String,
+    /// Claude Code model alias ("opus", "sonnet"…). Empty = the account's default.
+    #[serde(default)]
+    pub cli_model: String,
+    /// Compact opens by itself when the cursor rests on it, no click needed.
+    #[serde(default)]
+    pub open_on_hover: bool,
+    /// An open conversation folds like any other view (timer, click elsewhere)
+    /// instead of staying up until it is folded by hand.
+    #[serde(default)]
+    pub fold_during_chat: bool,
 }
+
+pub const BACKEND_CLAUDE_CODE: &str = "claudeCode";
+pub const BACKEND_API: &str = "api";
 
 fn default_model() -> String {
     crate::claude::DEFAULT_MODEL.to_string()
+}
+
+fn default_backend() -> String {
+    BACKEND_CLAUDE_CODE.to_string()
 }
 
 impl Default for Settings {
@@ -43,6 +64,10 @@ impl Default for Settings {
             autostart: false,
             hooks_installed: false,
             model: default_model(),
+            chat_backend: default_backend(),
+            cli_model: String::new(),
+            open_on_hover: false,
+            fold_during_chat: false,
         }
     }
 }

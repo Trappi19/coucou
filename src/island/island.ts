@@ -30,6 +30,12 @@ const UPLOAD_VIEWS: ReadonlySet<IslandViewName> = new Set(["upload", "uploading"
 /** Seconds between the drop and the moment the progress bar starts filling. */
 const PRE_PROGRESS = USC.T_PROG_START - USC.T_DROP;
 
+/**
+ * Frame interval while compact and at rest. Compact Mochi only breathes and the
+ * island now stays up all day, so it does not need 60 frames a second.
+ */
+const COMPACT_FRAME_MS = 40;
+
 const modeOrder = (m: IslandMode) => (m === "hidden" ? 0 : m === "compact" ? 1 : 2);
 
 export class Island {
@@ -73,6 +79,8 @@ export class Island {
   /** Last shape handed to Rust for the click-through test. */
   private pushedRect = { x: -1, y: -1, w: -1, h: -1 };
   private homeCollapseAt: number | null = null;
+  /** Folded in the middle of a conversation: opening again goes straight back to it. */
+  private reopenView: IslandViewName | null = null;
 
   // Bot hover → love (IslandWindowController.botHoverIn)
   private botHovering = false;
@@ -165,6 +173,11 @@ export class Island {
         void Bridge.saveSettings(State.settings);
         State.notify();
       },
+      toggleSetting: (key) => {
+        State.settings[key] = !State.settings[key];
+        this.applySettings();
+        void Bridge.saveSettings(State.settings);
+      },
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
       blip: () => Sound.play("blip"),
     };
@@ -225,6 +238,7 @@ export class Island {
 
   private wireFsm() {
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
+    this.fsm.holdOpen = () => this.engaged;
     this.fsm.onTransition = (from, to) => {
       switch (to) {
         case "hidden":
@@ -235,11 +249,11 @@ export class Island {
           else if (from === "hidden") Sound.play("peek");
           this.setMode("compact");
           if (from === "coucou") State.view = State.defaultView();
-          if (!this.wasInIsland) this.fsm.mouseLeft();
           break;
         case "home":
-          this.expand(State.defaultView());
-          if (!this.wasInIsland) this.fsm.mouseLeft();
+          this.expand(this.reopenView ?? State.defaultView());
+          this.reopenView = null;
+          if (!this.wasInIsland) this.fsm.openedUnattended();
           break;
         case "coucou":
           this.expand("greeting");
@@ -254,6 +268,27 @@ export class Island {
     this.fsm.launch();
   }
 
+  /**
+   * The island is in use and must not fold by itself — not on a timer, not on
+   * a click elsewhere: an alert waiting for an answer, a file being dropped, or
+   * a conversation (even one only being typed), unless the user chose to let
+   * conversations fold too.
+   */
+  private get engaged(): boolean {
+    if (State.isPinned || State.fileDragOver) return true;
+    if (State.view === "uploading" || State.view === "choose") return true;
+    if (State.view === "prompt" && !State.settings.foldDuringChat) {
+      return State.chatHistory.length > 0 || State.chatDraft.trim() !== "" || State.droppedFile != null;
+    }
+    return false;
+  }
+
+  /** A click somewhere else on screen: fold back to compact, unless in use. */
+  outsideClick() {
+    if (this.fsm.state !== "home" || this.engaged) return;
+    this.collapse();
+  }
+
   // ── Mode / view ─────────────────────────────────────────────────────────────
 
   private setMode(mode: IslandMode) {
@@ -265,6 +300,7 @@ export class Island {
       Sound.play("close");
       State.isPinned = false;
       void Bridge.focusWindow(false);
+      this.reopenView = State.view === "prompt" && State.chatHistory.length > 0 ? "prompt" : null;
     }
     if (mode !== "expanded") {
       this.engine.resetMorph();
@@ -386,9 +422,10 @@ export class Island {
    */
   private swallow(path: string) {
     const name = path.split(/[\\/]/).pop() || "file";
+    // A dropped file starts a new conversation, in the current project.
+    State.clearChat();
     State.droppedFile = { name, path };
     State.promptContext = { kind: "file", name, path };
-    State.chatHistory = [];
     void Bridge.chatReset();
 
     UploadSeq.performDrop(State.uploadDuration);
@@ -592,7 +629,7 @@ export class Island {
     }
     if (!inIsland && this.wasInIsland) {
       this.fsm.mouseLeft();
-      if (this.fsm.state === "home" && !State.isPinned) {
+      if (this.fsm.state === "home" && !this.engaged) {
         this.homeCollapseAt = performance.now() + State.settings.autoCloseInterval * 1000;
       }
     }
@@ -735,7 +772,13 @@ export class Island {
         !this.botCx.settled || !this.botCy.settled || !this.botSize.settled ||
         greetingActive || this.engine.busy || UploadSeq.isActive;
 
-    if (busy) {
+    const resting =
+      State.mode === "compact" && !settling &&
+      this.botCx.settled && this.botCy.settled && this.botSize.settled;
+
+    if (busy && resting) {
+      window.setTimeout(() => requestAnimationFrame(this.frame), COMPACT_FRAME_MS);
+    } else if (busy) {
       requestAnimationFrame(this.frame);
     } else {
       this.running = false;
@@ -852,6 +895,7 @@ export class Island {
     if (this.lastSyncedView !== State.view) {
       const wasChat = this.lastSyncedView === "prompt";
       this.lastSyncedView = State.view;
+      this.views.get(State.view)?.show?.();
       if (State.view === "prompt") {
         void Bridge.focusWindow(true);
         window.setTimeout(() => this.views.get("prompt")?.focus?.(), 120);
@@ -885,6 +929,7 @@ export class Island {
     Sound.setEnabled(State.settings.soundEnabled);
     Sound.setVolume(State.settings.soundVolume);
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
+    this.fsm.openOnHover = State.settings.openOnHover;
     State.notify();
   }
 

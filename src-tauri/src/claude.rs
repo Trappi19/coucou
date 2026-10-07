@@ -66,6 +66,9 @@ pub enum ChatContext {
 #[serde(rename_all = "camelCase")]
 pub struct ChatReply {
     pub text: String,
+    /// Claude Code's conversation id; the API keeps its history in memory instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
 }
 
 /// One chat turn. Returns the assistant's text, or a message the island shows
@@ -154,7 +157,7 @@ pub async fn send(
     if text.is_empty() {
         return Err("No response text.".into());
     }
-    Ok(ChatReply { text })
+    Ok(ChatReply { text, session_id: None })
 }
 
 async fn call(key: &str, body: &Value) -> Result<Value, String> {

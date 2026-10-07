@@ -5,7 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import type { Settings } from "./state";
+import type { ChatProject, ChatSession, Settings } from "./state";
 
 export const IS_TAURI =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -83,8 +83,18 @@ export const Bridge = {
   // ── Chat, files, secrets ──────────────────────────────────────────────────
   /** One chat turn. The API key and any file bytes never leave Rust. */
   chatSend: (query: string, context: ChatContext | null) =>
-    callOrThrow<{ text: string }>("chat_send", { query, context }),
+    callOrThrow<{ text: string; sessionId?: string }>("chat_send", { query, context }),
+  /** New conversation (same project). */
   chatReset: () => call<void>("chat_reset"),
+  /** Stops the Claude Code turn in flight; chatSend then fails with "Stopped.". */
+  chatCancel: () => call<void>("chat_cancel"),
+  /** Discussion first, then every folder Claude Code has been used in. */
+  chatProjects: () => callOrThrow<ChatProject[]>("chat_projects"),
+  chatSessions: (path: string) => callOrThrow<ChatSession[]>("chat_sessions", { path }),
+  /** Points the chat at a project and a conversation (null = a new one); returns its messages. */
+  chatOpen: (path: string, sessionId: string | null) =>
+    callOrThrow<{ role: "user" | "assistant"; content: string }[]>("chat_open", { path, sessionId }),
+  claudeCodeStatus: () => call<ClaudeCodeStatus>("claude_code_status"),
   /** Copies a dropped file into the inbox. */
   ingestFile: (path: string) => callOrThrow<DroppedFile>("ingest_file", { path }),
   /** Only ever tells you whether a key exists — never its value. */
@@ -111,6 +121,14 @@ export interface IntegrationUpdate {
 export type ChatContext =
   | { kind: "file"; name: string; path: string }
   | { kind: "window"; appName: string; title: string; url?: string };
+
+export interface ClaudeCodeStatus {
+  found: boolean;
+  path: string | null;
+  version: string | null;
+  /** `claude auth status` says it is signed in. */
+  loggedIn: boolean;
+}
 
 export interface DroppedFile {
   name: string;
