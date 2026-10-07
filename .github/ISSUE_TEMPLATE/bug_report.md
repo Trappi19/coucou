@@ -10,8 +10,8 @@ labels: bug
 
 **How to reproduce**
 
-**macOS version**
+**Windows version** (10 / 11, build)
 
-**Mac model**
+**Screen setup** (number of screens, scaling)
 
 **Coucou version**

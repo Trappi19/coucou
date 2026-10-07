@@ -1,7 +1,7 @@
 name: Windows
 
 # Builds the Windows app and publishes the installer.
-# Triggered by tags like `windows-v0.1.0`; the macOS workflows are untouched.
+# Triggered by tags like `windows-v0.1.0`.
 
 on:
   push:
@@ -22,10 +22,6 @@ env:
 jobs:
   build:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: windows
-
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +29,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: windows/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -41,8 +37,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            windows/target
-          key: windows-cargo-${{ hashFiles('windows/Cargo.lock') }}
+            target
+          key: windows-cargo-${{ hashFiles('Cargo.lock') }}
           restore-keys: windows-cargo-
 
       - name: Install dependencies
@@ -86,7 +82,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || env.PUBLISH == 'true'
         with:
           name: Coucou-Windows-setup
-          path: windows/release/Coucou-Windows-${{ steps.pack.outputs.version }}-setup.exe
+          path: release/Coucou-Windows-${{ steps.pack.outputs.version }}-setup.exe
           retention-days: 3
 
       # MSI installer generated via WiX toolset. Bypasses NSIS extractor false-positives
@@ -95,7 +91,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || env.PUBLISH == 'true'
         with:
           name: Coucou-Windows-msi
-          path: windows/release/Coucou-Windows-${{ steps.pack.outputs.version }}.msi
+          path: release/Coucou-Windows-${{ steps.pack.outputs.version }}.msi
           retention-days: 3
 
       # The unsigned NSIS installer is what Defender false-positives on, so the
@@ -107,8 +103,8 @@ jobs:
         with:
           name: Coucou-Windows-portable
           path: |
-            windows/target/release/coucou.exe
-            windows/target/release/coucou-hook.exe
+            target/release/coucou.exe
+            target/release/coucou-hook.exe
           retention-days: 3
 
       - name: Publish the release
@@ -125,16 +121,11 @@ jobs:
           code-signed yet, so Windows SmartScreen shows a warning: click
           **More info → Run anyway**.
           "@
-          # --latest=false is not cosmetic: without it GitHub hands "Latest" to
-          # whichever release was published last, and the site's Download for Mac
-          # button points at /releases/latest. A Windows tag would silently send
-          # Mac users to the .exe. The macOS `v*` releases own that slot.
           gh release create "${{ github.ref_name }}" `
             "release/Coucou-Windows-$v-setup.exe" `
             "release/Coucou-Windows-$v.msi" `
             --title "Coucou for Windows $v" `
-            --notes $notes `
-            --latest=false
+            --notes $notes
 
       - name: Update the rolling windows-latest release
         if: env.PUBLISH == 'true' && startsWith(github.ref, 'refs/tags/windows-v')

@@ -1,28 +1,12 @@
 # Coucou — third-party agent integration
 
-Any tool that can write to a Unix domain socket (macOS, Linux) or a named pipe (Windows) can send events to Coucou and have its own pill next to Claude Code.
+Any tool that can write to a named pipe can send events to Coucou and have its own pill next to Claude Code.
 
 ## The `coucou_agent` field
 
 Add the optional field `coucou_agent` to any hook JSON payload. Coucou will create a pill labelled with the agent name and route all events to it.
 
 **Validation:** the name must match `^[a-z0-9-]{1,24}$` (lowercase letters, digits and hyphens, 1–24 characters). An absent or invalid name routes the event to the Claude Code pill instead.
-
-## Hook command (macOS)
-
-Configure your tool to call the Coucou relay with `--agent <your-name>` after the hook executable:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      { "type": "command", "command": "/path/to/nb-hook --agent my-tool" }
-    ]
-  }
-}
-```
-
-The shell wrapper passes `"$@"` to the Python relay, which extracts the agent name and injects it into the payload before forwarding to Coucou.
 
 ## Hook command (Windows)
 
@@ -38,23 +22,9 @@ Same pattern with the Windows relay:
 }
 ```
 
-## Hook command (Linux)
-
-Same pattern with the Linux relay. Coucou copies the relay to `~/.local/share/coucou/bin/coucou-hook` at startup.
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      { "type": "command", "command": "/path/to/coucou-hook --agent my-tool" }
-    ]
-  }
-}
-```
-
 ## Payload format
 
-The relay adds `coucou_agent` to the JSON it forwards. You can also add it yourself if you talk to the socket directly:
+The relay adds `coucou_agent` to the JSON it forwards. You can also add it yourself if you talk to the pipe directly:
 
 ```json
 {
@@ -65,11 +35,7 @@ The relay adds `coucou_agent` to the JSON it forwards. You can also add it yours
 }
 ```
 
-Send newline-terminated JSON to the socket:
-- **macOS (GitHub build):** `~/Library/Application Support/NotchBuddy/nb.sock`
-- **macOS (App Store build):** `~/Library/Containers/fr.louisraille.Coucou/Data/nb.sock`
-- **Windows:** `\\.\pipe\coucou-<user-SID>`
-- **Linux:** `$XDG_RUNTIME_DIR/coucou.sock` (usually `/run/user/<uid>/coucou.sock`). Only your own user account can connect.
+Send newline-terminated JSON to the named pipe `\\.\pipe\coucou-<user-SID>`.
 
 ## Supported events
 
@@ -106,6 +72,9 @@ and Amp (`agent_amp`) in Settings → Active pills. Cursor (`agent_cursor`) and 
 the main pill; session support is coming in a future version.
 
 ## Real-world examples
+
+These come from the original macOS app: the event translations still apply, the
+paths do not (see the README's *Supported agents* table for Windows).
 
 ### Gemini CLI (macOS)
 
@@ -206,29 +175,16 @@ The `tool.call` handler returns `{ action: 'allow' }` so Amp always proceeds; al
 
 ### Any other tool
 
-Follow the generic pattern: call `nb-hook --agent <your-name> <EventName>` (macOS),
-`coucou-hook.exe --agent <your-name> <EventName>` (Windows)
-or `~/.local/share/coucou/bin/coucou-hook --agent <your-name> <EventName>` (Linux)
-and let the relay forward the event.
+Call `coucou-hook.exe --agent <your-name> <EventName>` (it lives in
+`%LOCALAPPDATA%\Coucou\bin\`) and let the relay forward the event.
 
-## Quick test (Linux)
+## Quick test
 
-With Coucou running:
+With Coucou running, in PowerShell:
 
-```sh
-echo '{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"hello","coucou_agent":"demo"}' \
-  | ~/.local/share/coucou/bin/coucou-hook --agent demo
-```
-
-A "demo" pill should appear in the island.
-
-## Quick test (macOS)
-
-With Coucou running:
-
-```sh
-echo '{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"hello","coucou_agent":"demo"}' \
-  | /bin/sh ~/Library/Application\ Support/NotchBuddy/nb-hook --agent demo
+```powershell
+'{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"hello","coucou_agent":"demo"}' |
+  & "$env:LOCALAPPDATA\Coucou\bin\coucou-hook.exe" --agent demo
 ```
 
 A "demo" pill should appear in the island.
