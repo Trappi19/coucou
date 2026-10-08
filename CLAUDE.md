@@ -15,7 +15,9 @@ Windows-only fork of Coucou. Mochi, a small animated character living at the top
 npm install
 npm run tauri dev   # dev build
 npm run pack        # NSIS + MSI installers in release/
+npm run release     # bump the version, pack, and hand the setup to the installed Coucou
 ```
+Updates are local only: `release` puts the NSIS setup and a `latest.json` in `%LOCALAPPDATA%\Coucou\updates`; the app (`updates.rs`) offers it and, on an explicit click, runs it with `/P /UPDATE /R` (in place, then restart).
 Needs Rust (MSVC toolchain), Node 20+, Visual Studio Build Tools ("Desktop development with C++").
 
 ## Rules

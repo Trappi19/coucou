@@ -121,6 +121,12 @@ export const Bridge = {
   /** Opens the configured n8n instance in the browser. */
   openN8n: () => call<void>("open_n8n"),
 
+  // ── Local updates ─────────────────────────────────────────────────────────
+  updateStatus: () => call<UpdateStatus>("update_status"),
+  /** Explicit click only: runs the newer installer, which restarts Coucou. */
+  updateInstall: () => callOrThrow<void>("update_install"),
+  openUpdatesFolder: () => call<void>("open_updates_folder"),
+
   /** Tray → Pause. Stops the integration pollers, not just the island. */
   setPaused: (paused: boolean) => call<void>("set_paused", { paused }),
 };
@@ -135,6 +141,19 @@ export interface IntegrationUpdate {
 export type ChatContext =
   | { kind: "file"; name: string; path: string }
   | { kind: "window"; appName: string; title: string; url?: string };
+
+/** A newer build waiting in %LOCALAPPDATA%\Coucou\updates (see `npm run release`). */
+export interface UpdateInfo {
+  version: string;
+  path: string;
+  builtAt: string | null;
+}
+
+export interface UpdateStatus {
+  current: string;
+  folder: string;
+  available: UpdateInfo | null;
+}
 
 export interface ClaudeCodeStatus {
   found: boolean;

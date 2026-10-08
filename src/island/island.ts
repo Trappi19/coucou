@@ -190,6 +190,14 @@ export class Island {
         void Bridge.saveSettings(State.settings);
       },
       startResize: () => this.startResize(),
+      installUpdate: () => {
+        Sound.play("approve");
+        Bridge.updateInstall().catch((err) => {
+          State.noteMessage = String(err).replace(/^Error:\s*/, "");
+          this.setView("note");
+          Sound.play("error");
+        });
+      },
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
       blip: () => Sound.play("blip"),
     };
@@ -307,6 +315,17 @@ export class Island {
     }
     if (!State.settings.foldDuringChat && this.views.get(State.view)?.engaged?.()) return true;
     return false;
+  }
+
+  /**
+   * A newer local build landed: show it, unless that would pull the user out
+   * of what they are doing — then it waits in the island's settings (⚙).
+   */
+  offerUpdate() {
+    if (!State.update || State.paused || this.fsm.state === "coucou") return;
+    if (State.mode === "expanded" && this.engaged) return;
+    Sound.play("finish");
+    this.alert("update");
   }
 
   /** A click somewhere else on screen: fold back to compact, unless in use. */

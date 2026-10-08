@@ -30,6 +30,8 @@ export interface ViewActions {
   toggleSetting(key: "openOnHover" | "foldDuringChat"): void;
   /** Resize mode: the island holds still while its size is set. */
   startResize(): void;
+  /** Runs the newer local build's installer; Coucou restarts by itself. */
+  installUpdate(): void;
   openSettingsWindow(): void;
   blip(): void;
 }
@@ -449,6 +451,12 @@ function buildSettings(actions: ViewActions): ViewHost {
   );
   const claudeBadge = h("span", { class: "status-badge" });
   const apiBadge = h("span", { class: "status-badge" });
+  // Only there when a newer local build is waiting.
+  const updateLink = h("button", {
+    class: "link-btn",
+    style: "color:#34d399;font-size:11.5px",
+    onclick: () => actions.setView("update"),
+  });
   const hoverSwitch = h("button", { class: "switch", onclick: () => actions.toggleSetting("openOnHover") });
   const chatFoldSwitch = h("button", { class: "switch", onclick: () => actions.toggleSetting("foldDuringChat") });
 
@@ -478,6 +486,7 @@ function buildSettings(actions: ViewActions): ViewHost {
       claudeBadge,
       apiBadge,
       h("div", { class: "grow" }),
+      updateLink,
       h("button", {
         class: "link-btn",
         style: "color:#8e939c;font-size:11.5px",
@@ -503,6 +512,8 @@ function buildSettings(actions: ViewActions): ViewHost {
       const s = State.settings;
       soundSwitch.classList.toggle("on", s.soundEnabled);
       hoverSwitch.classList.toggle("on", s.openOnHover);
+      updateLink.textContent = State.update ? `Update ${State.update.version}` : "";
+      updateLink.style.display = State.update ? "" : "none";
       chatFoldSwitch.classList.toggle("on", s.foldDuringChat);
       volume.value = String(s.soundVolume);
       volume.style.opacity = s.soundEnabled ? "1" : "0.4";
@@ -535,6 +546,31 @@ function buildResize(): ViewHost {
   return { el: h("div", { class: "view" }, card("indigo", body)), sync() {} };
 }
 
+// ── Update ────────────────────────────────────────────────────────────────────
+
+function buildUpdate(actions: ViewActions): ViewHost {
+  const title = h("div", { class: "title" });
+  const sub = h("div", { class: "sub" });
+  const install = btn("Install", "primary", () => actions.installUpdate());
+  const row = h("div", { class: "actions" }, install, btn("Later", "secondary", () => actions.collapse()));
+  const el = h("div", { class: "view" }, card("green", stack(116, 16, title, sub, row)));
+  return {
+    el,
+    sync() {
+      const u = State.update;
+      title.textContent = u ? `Coucou ${u.version} is ready.` : "Coucou is up to date.";
+      const built = u?.builtAt ? new Date(u.builtAt) : null;
+      const when = built && !Number.isNaN(built.getTime())
+        ? `Built ${built.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}. `
+        : "";
+      sub.textContent = u
+        ? `${when}Installs in a few seconds, then Mochi comes back. Nothing else changes.`
+        : "Run npm run release to build a new version.";
+      install.style.display = u ? "" : "none";
+    },
+  };
+}
+
 // ── Placeholders filled in later stages ───────────────────────────────────────
 
 function buildPlaceholder(title: string, sub: string): ViewHost {
@@ -564,6 +600,7 @@ export function buildViews(
   map.set("note", buildNote());
   map.set("settings", buildSettings(actions));
   map.set("resize", buildResize());
+  map.set("update", buildUpdate(actions));
   map.set("prompt", buildPrompt(actions, onChatHeightChange));
   map.set("sessions", buildSessions(actions));
   map.set("notes", buildNotes(actions));

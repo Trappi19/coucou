@@ -1,7 +1,7 @@
 {
   "name": "coucou-windows",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "tauri": "tauri",
     "predev": "cargo build --release -p coucou-hook",
     "prebuild": "cargo build --release -p coucou-hook",
-    "pack": "tauri build && node scripts/pack.mjs"
+    "pack": "tauri build && node scripts/pack.mjs",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

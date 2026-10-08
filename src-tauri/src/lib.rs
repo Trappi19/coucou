@@ -13,6 +13,7 @@ mod platform;
 mod secrets;
 mod settings;
 mod tray;
+mod updates;
 
 use std::process::Command;
 use std::sync::atomic::Ordering;
@@ -373,6 +374,26 @@ async fn refresh_integration(app: AppHandle, id: String) {
     integrations::poll_once(app, &id).await;
 }
 
+// ── Local updates ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn update_status() -> updates::UpdateStatus {
+    updates::status()
+}
+
+/// Only ever called from an explicit click: installs the newer build and restarts.
+#[tauri::command]
+fn update_install(app: AppHandle) -> Result<(), String> {
+    updates::install(&app)
+}
+
+#[tauri::command]
+fn open_updates_folder() {
+    let dir = updates::updates_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    platform::reveal_folder(&dir.to_string_lossy());
+}
+
 /// Lets the island write to the same log as the Rust side.
 #[tauri::command]
 async fn notes_load() -> Result<Option<String>, String> {
@@ -515,6 +536,9 @@ pub fn run() {
             open_n8n,
             open_settings_window,
             set_paused,
+            update_status,
+            update_install,
+            open_updates_folder,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -540,6 +564,7 @@ pub fn run() {
             hooks::ensure_hook_exe(&handle);
             pipe::start(handle.clone());
             integrations::start(handle.clone());
+            updates::start(handle.clone());
             Ok(())
         })
         .run(tauri::generate_context!())

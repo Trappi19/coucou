@@ -1,7 +1,7 @@
 // Entry point: boot the bridge, wire the island, start the greeting.
 
 import "./style.css";
-import { Bridge, IS_TAURI, onEvent } from "./core/bridge";
+import { Bridge, IS_TAURI, onEvent, type UpdateInfo } from "./core/bridge";
 import { Sound } from "./core/sound";
 import { State, type Settings } from "./core/state";
 import { Island } from "./island/island";
@@ -53,6 +53,13 @@ async function main() {
 
   void refreshChatReady();
 
+  // A new local build (npm run release) landed in the updates folder.
+  await onEvent<UpdateInfo | null>("update-available", (info) => {
+    State.update = info ? { version: info.version, builtAt: info.builtAt } : null;
+    State.notify();
+    island.offerUpdate();
+  });
+
   /** Pause has to reach Rust too, or the pollers keep calling out. */
   const setPaused = (on: boolean) => {
     if (State.paused === on) return;
@@ -69,6 +76,13 @@ async function main() {
       case "open":
         setPaused(false);
         island.alert(State.defaultView());
+        break;
+      case "updates":
+        // Tray → Check for updates: the card says either way.
+        void Bridge.updateStatus().then((s) => {
+          State.update = s?.available ? { version: s.available.version, builtAt: s.available.builtAt } : null;
+          island.alert("update");
+        });
         break;
       case "resize":
         setPaused(false);
@@ -98,6 +112,13 @@ async function main() {
   registerIntegrationHandlers(island);
 
   island.launch();
+
+  // One built while Coucou was closed: offer it once the greeting is over.
+  const status = await Bridge.updateStatus();
+  if (status?.available) {
+    State.update = { version: status.available.version, builtAt: status.available.builtAt };
+    window.setTimeout(() => island.offerUpdate(), 6000);
+  }
 
   // In a plain browser there is no wake strip behind the cursor: make the whole
   // page wake the island so the visuals can be checked with `npm run dev`.

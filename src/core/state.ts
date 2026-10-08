@@ -186,6 +186,9 @@ class AppState {
   chatReady: boolean | null = null;
   pendingApproval: ApprovalInfo | null = null;
 
+  /** A newer local build ready to install, if any. */
+  update: { version: string; builtAt: string | null } | null = null;
+
   /** Resize mode: the island holds still while the user sets its size. */
   resizing = false;
   /** Which of the two sizes is being set. */

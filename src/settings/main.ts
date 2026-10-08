@@ -538,6 +538,58 @@ function generalSection(): HTMLElement {
   );
 }
 
+// ── Updates section ───────────────────────────────────────────────────────────
+
+/** Local updates: `npm run release` drops a newer installer in the folder below. */
+function updatesSection(): HTMLElement {
+  const dot = statusDot(true);
+  const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
+
+  async function draw() {
+    const status = await Bridge.updateStatus();
+    clear(body);
+    const available = status?.available ?? null;
+    dot.style.background = available ? "#22c55e" : "#6b7079";
+    body.append(
+      h("div", { class: "row" },
+        h("label", { text: "Installed" }),
+        h("span", { text: status?.current ?? "?" }),
+      ),
+      h("div", { class: "row" },
+        h("label", { text: "Updates folder" }),
+        h("span", { class: "path", text: status?.folder ?? "" }),
+        h("button", { text: "Open", onclick: () => void Bridge.openUpdatesFolder() }),
+      ),
+    );
+    if (available) {
+      const install = h("button", { class: "primary", text: `Install ${available.version} and restart` });
+      install.addEventListener("click", async () => {
+        install.toggleAttribute("disabled", true);
+        try {
+          await Bridge.updateInstall();
+        } catch (err) {
+          install.toggleAttribute("disabled", false);
+          body.append(h("div", { class: "notice err", text: String(err).replace(/^Error:\s*/, "") }));
+        }
+      });
+      body.append(h("div", { class: "row" }, install));
+    } else {
+      body.append(h("div", { class: "row" },
+        h("span", { class: "hint", text: "Up to date." }),
+        h("button", { text: "Check again", onclick: () => void draw() }),
+      ));
+    }
+    body.append(h("div", {
+      class: "hint",
+      text: "No server involved: `npm run release` builds a new version and puts its installer in this folder. Mochi offers it within a minute; installing keeps your settings, keys and conversations.",
+    }));
+  }
+
+  void draw();
+  void onEvent("update-available", () => void draw());
+  return h("section", {}, h("h2", {}, dot, h("span", { text: "Updates" })), body);
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -567,6 +619,7 @@ async function main() {
     chatSection(cli, hasKey),
     integrationsSection(present),
     generalSection(),
+    updatesSection(),
     h("div", {
       class: "hint",
       text: "No telemetry. Network requests only go to the services you configure yourself.",

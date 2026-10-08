@@ -24,6 +24,7 @@ export type IslandViewName =
   | "note"
   | "settings"
   | "resize"
+  | "update"
   | "greeting";
 
 export type BotStateName =
@@ -95,6 +96,8 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   settings: { height: 190, botX: 54, botY: null, botDiameter: 46, agentMode: "none" },
   // The island while its size is being set: Mochi and a line of help.
   resize: { height: 160, botX: 70, botY: null, botDiameter: 62, agentMode: "none" },
+  // A newer local build is ready: install it or later.
+  update: { height: 160, botX: 62, botY: null, botDiameter: 58, agentMode: "column" },
   greeting: { height: 150, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
 };
 
