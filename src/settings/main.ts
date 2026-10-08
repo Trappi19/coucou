@@ -3,7 +3,7 @@
 // integrations land here too in a later stage.
 
 import "./settings.css";
-import { Bridge, onEvent, type ClaudeCodeStatus, type HookStatus } from "../core/bridge";
+import { Bridge, onEvent, type ClaudeCodeStatus, type HookStatus, type ShortcutStatus } from "../core/bridge";
 import { DEFAULT_SETTINGS, type ChatBackend, type Settings } from "../core/state";
 import { h, clear } from "../views/dom";
 
@@ -197,6 +197,7 @@ function chatSection(status: ClaudeCodeStatus | null, hasKey: boolean): HTMLElem
   const pick = h("select", {}) as HTMLSelectElement;
   pick.append(
     h("option", { value: "claudeCode", text: "My Claude subscription (Claude Code)" }),
+    h("option", { value: "local", text: "A model on this computer (Ollama, LM Studio…)" }),
     h("option", { value: "api", text: "An Anthropic API key" }),
   );
   pick.value = settings.chatBackend;
@@ -210,6 +211,10 @@ function chatSection(status: ClaudeCodeStatus | null, hasKey: boolean): HTMLElem
     clear(body);
     if (settings.chatBackend === "api") {
       body.append(apiRows(hasKey, (ok) => (dot.style.background = ok ? "#22c55e" : "#f4505e")));
+      return;
+    }
+    if (settings.chatBackend === "local") {
+      body.append(localRows((ok) => (dot.style.background = ok ? "#22c55e" : "#f4505e")));
       return;
     }
     const ready = (status?.found ?? false) && (status?.loggedIn ?? false);
@@ -242,8 +247,23 @@ function chatSection(status: ClaudeCodeStatus | null, hasKey: boolean): HTMLElem
       settings.cliModel = model.value;
       void save();
     });
+    // The 5 h / week gauges, fetched in the background.
+    const refresh = h("select", {}) as HTMLSelectElement;
+    for (const [minutes, label] of [[5, "Every 5 min"], [15, "Every 15 min"], [30, "Every 30 min"], [0, "Never (only when I open it)"]] as const) {
+      refresh.append(h("option", { value: String(minutes), text: label }));
+    }
+    refresh.value = String(settings.planRefreshMinutes ?? 5);
+    refresh.addEventListener("change", () => {
+      settings.planRefreshMinutes = Number(refresh.value);
+      void save();
+    });
     body.append(
       h("div", { class: "row" }, h("label", { text: "Model" }), model),
+      h("div", { class: "row" },
+        h("label", { text: "Plan usage refresh" }),
+        refresh,
+        h("span", { class: "hint", text: "a one-word question to Haiku (~700 tokens)" }),
+      ),
       h("div", {
         class: "hint",
         text: "Conversations are saved by Claude Code. Without a project picked they go to “Discussion”; pick a project or an old conversation from the clock tab in the island.",
@@ -258,6 +278,96 @@ function chatSection(status: ClaudeCodeStatus | null, hasKey: boolean): HTMLElem
     h("h2", {}, dot, h("span", { text: "Mochi's chat" })),
     h("div", { class: "row" }, h("label", { text: "Answer with" }), pick),
     body,
+  );
+}
+
+/** The usual addresses of the two servers people run; anything else can be typed. */
+const LOCAL_SERVERS: [string, string][] = [
+  ["Ollama", "http://127.0.0.1:11434"],
+  ["LM Studio", "http://127.0.0.1:1234"],
+];
+
+/** A model running on this computer: where the server is, and which model. */
+function localRows(onReady: (ok: boolean) => void): HTMLElement {
+  const url = h("input", {
+    type: "text",
+    placeholder: "http://127.0.0.1:11434",
+    value: settings.localUrl || LOCAL_SERVERS[0][1],
+    spellcheck: "false",
+    style: "flex:1 1 auto;min-width:0",
+  }) as HTMLInputElement;
+  const presets = LOCAL_SERVERS.map(([name, address]) =>
+    h("button", {
+      text: name,
+      onclick: () => {
+        url.value = address;
+        void connect();
+      },
+    }));
+  const connectBtn = h("button", { class: "primary", text: "Connect" });
+  const model = h("select", { style: "min-width:220px" }) as HTMLSelectElement;
+  const feedback = h("div", {});
+  const modelRow = h("div", { class: "row" }, h("label", { text: "Model" }), model);
+
+  function showModels(models: string[]) {
+    clear(model);
+    for (const m of models) model.append(h("option", { value: m, text: m }));
+    if (settings.localModel && !models.includes(settings.localModel)) {
+      model.append(h("option", { value: settings.localModel, text: `${settings.localModel} (not found)` }));
+    }
+    model.value = settings.localModel || models[0] || "";
+    modelRow.style.display = model.options.length ? "" : "none";
+    if (!settings.localModel && model.value) pickModel();
+    onReady(model.value !== "");
+  }
+
+  function pickModel() {
+    settings.localModel = model.value;
+    void save();
+    onReady(model.value !== "");
+  }
+
+  async function connect() {
+    clear(feedback);
+    connectBtn.toggleAttribute("disabled", true);
+    try {
+      const models = await Bridge.localModels(url.value);
+      settings.localUrl = url.value.trim();
+      void save();
+      if (models.length === 0) {
+        feedback.append(h("div", {
+          class: "notice warn",
+          text: "Connected, but the server has no chat model yet. With Ollama: `ollama pull llama3.2` in a terminal, then Connect again.",
+        }));
+      } else {
+        feedback.append(h("div", { class: "notice ok", text: `${models.length} model${models.length > 1 ? "s" : ""} found.` }));
+      }
+      showModels(models);
+    } catch (err) {
+      feedback.append(h("div", { class: "notice err", text: String(err).replace(/^Error:\s*/, "") }));
+    } finally {
+      connectBtn.toggleAttribute("disabled", false);
+    }
+  }
+
+  connectBtn.addEventListener("click", () => void connect());
+  model.addEventListener("change", pickModel);
+  modelRow.style.display = "none";
+  onReady(settings.localModel !== "");
+  // Already set up: show its models straight away.
+  if (settings.localUrl) void connect();
+
+  return h(
+    "div",
+    { style: "display:flex;flex-direction:column;gap:12px" },
+    h("div", {
+      class: "hint",
+      text: "Free and private: the model runs on your PC, nothing leaves it, no quota. Install Ollama (ollama.com) or LM Studio, download a model, then connect. Mochi can read text files you drop, but can't search the web this way.",
+    }),
+    h("div", { class: "row" }, h("label", { text: "Server" }), ...presets),
+    h("div", { class: "row" }, h("label", { text: "Address" }), url, connectBtn),
+    modelRow,
+    feedback,
   );
 }
 
@@ -538,6 +648,68 @@ function generalSection(): HTMLElement {
   );
 }
 
+// ── Shortcuts section ─────────────────────────────────────────────────────────
+
+const SHORTCUT_STATUS: Record<ShortcutStatus["status"], [string, string]> = {
+  active: ["#22c55e", ""],
+  off: ["#6b7079", ""],
+  inUse: ["#f5a524", "taken by another app"],
+  duplicate: ["#f5a524", "used twice"],
+  invalid: ["#f4505e", "not a valid shortcut"],
+};
+
+/** Global shortcuts: each one can be turned off or given other keys ("Ctrl+Alt+K"). */
+function shortcutsSection(): HTMLElement {
+  const list = h("div", { style: "display:flex;flex-direction:column;gap:8px" });
+
+  function store(id: string, keys: string, enabled: boolean) {
+    settings.shortcuts = { ...settings.shortcuts, [id]: { keys, enabled } };
+    void save().then(() => window.setTimeout(() => void draw(), 150));
+  }
+
+  async function draw() {
+    const rows = (await Bridge.shortcutsStatus()) ?? [];
+    clear(list);
+    for (const s of rows) {
+      const [color, why] = SHORTCUT_STATUS[s.status] ?? SHORTCUT_STATUS.off;
+      const keys = h("input", {
+        type: "text",
+        value: s.keys,
+        placeholder: s.defaultKeys,
+        spellcheck: "false",
+        style: "width:150px",
+      }) as HTMLInputElement;
+      keys.addEventListener("change", () => store(s.id, keys.value.trim(), s.enabled));
+      const reset = h("button", {
+        text: "Default",
+        title: s.defaultKeys,
+        onclick: () => store(s.id, s.defaultKeys, true),
+      });
+      reset.style.visibility = s.keys === s.defaultKeys && s.enabled ? "hidden" : "visible";
+      list.append(h("div", { class: "row", style: "gap:10px" },
+        toggle(s.enabled, (on) => store(s.id, keys.value.trim(), on)),
+        h("span", { style: "min-width:200px;font-size:12.5px", text: s.label }),
+        keys,
+        h("i", { class: "dot", title: why, style: `background:${color}` }),
+        why ? h("span", { class: "hint", text: why }) : null,
+        reset,
+      ));
+    }
+  }
+
+  void draw();
+  return h(
+    "section",
+    {},
+    h("h2", {}, h("span", { text: "Shortcuts" })),
+    h("div", {
+      class: "hint",
+      text: "Work from any app. Type the keys as Ctrl+Alt+K, Ctrl+Shift+Space… Ctrl+Alt is AltGr on French keyboards: avoid letters that type a character with AltGr (E → €).",
+    }),
+    list,
+  );
+}
+
 // ── Updates section ───────────────────────────────────────────────────────────
 
 /** Local updates: `npm run release` drops a newer installer in the folder below. */
@@ -619,6 +791,7 @@ async function main() {
     chatSection(cli, hasKey),
     integrationsSection(present),
     generalSection(),
+    shortcutsSection(),
     updatesSection(),
     h("div", {
       class: "hint",

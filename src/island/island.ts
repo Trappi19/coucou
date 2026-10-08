@@ -9,6 +9,7 @@ import {
   islandSize,
   type IslandMode, type IslandViewName,
 } from "../core/layout";
+import { dominantPct, planColor } from "../core/plan";
 import { SCALE_MAX, canvasDpr, clampScale, setRenderScale } from "../core/scale";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
@@ -18,7 +19,7 @@ import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from ".
 import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
-import { h } from "../views/dom";
+import { dot, h } from "../views/dom";
 import { IslandStateMachine } from "./fsm";
 import { ResizeController, type ResizeTarget } from "./resize";
 
@@ -52,6 +53,8 @@ export class Island {
   private botGlow!: HTMLElement;
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
+  /** The plan percentage shown in compact. */
+  private planCompact!: HTMLElement;
   private countdown!: HTMLElement;
   private wakeStrip!: HTMLElement;
 
@@ -207,6 +210,7 @@ export class Island {
     this.botCanvas = h("canvas", { id: "bot-canvas" });
     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
     this.miniGrid = h("div", { id: "mini-grid" });
+    this.planCompact = h("div", { id: "plan-compact" });
     this.countdown = h("div", { id: "countdown" });
 
     this.header = buildHeader(actions);
@@ -255,6 +259,7 @@ export class Island {
       this.botGlow,
       this.botCanvas,
       this.miniGrid,
+      this.planCompact,
       this.countdown,
       ...this.resize.handles,
     );
@@ -689,6 +694,7 @@ export class Island {
     // the state-driven DOM sync.
     this.miniGrid.style.left = `${w - 40 - 14.5}px`;
     this.miniGrid.style.top = `${hh / 2 - 14.5}px`;
+    this.planCompact.style.top = `${hh / 2}px`;
     this.greetingCanvas.style.left = `${(w - EXPANDED_W) / 2}px`;
     this.uploadCanvas.el.style.left = `${(w - EXPANDED_W) / 2}px`;
 
@@ -1113,6 +1119,20 @@ export class Island {
           this.miniGrid.append(createMiniBot(t, 13));
         }
         pruneMiniBots();
+      }
+    }
+
+    // Compact keeps the plan in sight: "● 28%" between Mochi and the grid.
+    const pct = dominantPct(State.planUsage);
+    const showPlan = State.mode === "compact" && State.usesClaudeCode && pct != null;
+    this.planCompact.style.opacity = showPlan ? "1" : "0";
+    if (showPlan) {
+      const label = `${Math.round(pct)}%`;
+      if (this.planCompact.dataset.label !== label) {
+        this.planCompact.dataset.label = label;
+        const color = planColor(pct);
+        this.planCompact.replaceChildren(dot(color, 5), h("span", { text: label }));
+        this.planCompact.style.color = color;
       }
     }
 

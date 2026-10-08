@@ -301,6 +301,8 @@ fn run_turn(
             match event.get("type").and_then(Value::as_str) {
                 Some("assistant") => report_tools(app, &event),
                 Some("stream_event") => stream_text(app, &event),
+                // Every turn tells where the plan stands: the gauges ride along for free.
+                Some("rate_limit_event") => report_plan(app, &event),
                 Some("result") => result = Some(event),
                 _ => {}
             }
@@ -427,6 +429,126 @@ fn report_tools(app: &AppHandle, event: &Value) {
             _ => "Working…".to_string(),
         };
         let _ = app.emit_to(island::WINDOW_LABEL, "chat-activity", Activity { tool, label });
+    }
+}
+
+// ── Plan usage ───────────────────────────────────────────────────────────────
+//
+// Claude Code reports the account's limits with each turn (`rate_limit_event`,
+// the same numbers as its /usage): how much of the 5-hour and weekly windows is
+// used and when each resets. That covers the whole account — Claude Desktop,
+// the terminal, Mochi — and needs no credentials of ours.
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanWindow {
+    /// 0–100.
+    pub used_pct: f64,
+    /// Epoch milliseconds.
+    pub resets_at: u64,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanUsage {
+    pub five_hour: Option<PlanWindow>,
+    pub seven_day: Option<PlanWindow>,
+    /// Epoch milliseconds.
+    pub updated_at: u64,
+}
+
+/// A refresh is a one-word question to the smallest model: about a second, and
+/// a sliver of the plan.
+const PLAN_REFRESH_TIMEOUT: Duration = Duration::from_secs(90);
+
+fn plan_window(raw: Option<&Value>) -> Option<PlanWindow> {
+    let w = raw?;
+    let utilization = w.get("utilization")?.as_f64()?;
+    let resets = w.get("resetsAt")?.as_f64()?;
+    // 0–2: a plan over its limit is shown full. Anything else is not a ratio.
+    if !(0.0..=2.0).contains(&utilization) || resets <= 0.0 {
+        return None;
+    }
+    Some(PlanWindow {
+        used_pct: (utilization * 100.0).min(100.0),
+        resets_at: (resets * 1000.0) as u64,
+    })
+}
+
+fn parse_plan(event: &Value) -> Option<PlanUsage> {
+    let windows = event.pointer("/rate_limit_info/unifiedWindows")?;
+    let five_hour = plan_window(windows.get("five_hour"));
+    let seven_day = plan_window(windows.get("seven_day"));
+    if five_hour.is_none() && seven_day.is_none() {
+        return None;
+    }
+    Some(PlanUsage { five_hour, seven_day, updated_at: millis(SystemTime::now()) })
+}
+
+fn report_plan(app: &AppHandle, event: &Value) {
+    if let Some(usage) = parse_plan(event) {
+        let _ = app.emit_to(island::WINDOW_LABEL, "plan-usage", usage);
+    }
+}
+
+/// Asks Claude Code for fresh numbers with the smallest possible turn: Haiku,
+/// no tools, a one-line system prompt instead of Claude Code's own, no
+/// settings, no slash commands, nothing saved to the history. Measured: about
+/// 700 tokens a refresh, against ~6,900 with the default prompt.
+pub fn refresh_plan(app: &AppHandle) -> Result<PlanUsage, String> {
+    let exe = find_cli().ok_or_else(|| NOT_INSTALLED.to_string())?;
+    let dir = discussion_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let mut cmd = base_command(&exe);
+    cmd.args(["-p", "--output-format", "stream-json", "--verbose", "--model", "haiku"])
+        .args(["--tools", "", "--strict-mcp-config", "--no-session-persistence"])
+        .args(["--system-prompt", "Reply in one word.", "--disable-slash-commands", "--setting-sources", ""])
+        .current_dir(&dir)
+        .env(SILENCE_HOOK_VAR, "1")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    let mut child = cmd.spawn().map_err(|e| format!("Could not start Claude Code: {e}"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(b"Reply with the single word: ok");
+    }
+    let stdout = child.stdout.take();
+    let child = std::sync::Arc::new(Mutex::new(child));
+
+    let (done_tx, done_rx) = mpsc::channel::<()>();
+    let watched = child.clone();
+    std::thread::spawn(move || {
+        if done_rx.recv_timeout(PLAN_REFRESH_TIMEOUT) == Err(mpsc::RecvTimeoutError::Timeout) {
+            let _ = watched.lock().unwrap().kill();
+        }
+    });
+
+    let mut usage = None;
+    let mut failure = None;
+    if let Some(out) = stdout {
+        for line in BufReader::new(out).lines() {
+            let Ok(line) = line else { break };
+            let Ok(event) = serde_json::from_str::<Value>(&line) else { continue };
+            match event.get("type").and_then(Value::as_str) {
+                Some("rate_limit_event") => usage = parse_plan(&event).or(usage),
+                Some("result") if event.get("is_error").and_then(Value::as_bool) == Some(true) => {
+                    failure = event.get("result").and_then(Value::as_str).map(str::to_string);
+                }
+                _ => {}
+            }
+        }
+    }
+    let _ = done_tx.send(());
+    let _ = child.lock().unwrap().wait();
+
+    match (usage, failure) {
+        (Some(u), _) => {
+            let _ = app.emit_to(island::WINDOW_LABEL, "plan-usage", u.clone());
+            Ok(u)
+        }
+        (None, Some(text)) if looks_logged_out(&text) => Err(NOT_LOGGED_IN.into()),
+        (None, Some(text)) => Err(text),
+        (None, None) => Err("Claude Code didn't report the plan's usage. It only does for Pro and Max plans.".into()),
     }
 }
 
@@ -780,6 +902,35 @@ mod tests {
             "content": "<mochi-context>\nThe user dropped a file\n</mochi-context>\n\nRésume-le"
         } });
         assert_eq!(user_text(&msg).as_deref(), Some("Résume-le"));
+    }
+
+    #[test]
+    fn plan_usage_is_read_from_rate_limit_events() {
+        // As Claude Code 2.1 sends it.
+        let event = json!({ "type": "rate_limit_event", "rate_limit_info": {
+            "status": "allowed", "resetsAt": 1791460800, "rateLimitType": "five_hour",
+            "unifiedWindows": {
+                "five_hour": { "utilization": 0.28, "resetsAt": 1791460800 },
+                "seven_day": { "utilization": 0.18, "resetsAt": 1791781200 }
+            }
+        } });
+        let u = parse_plan(&event).unwrap();
+        let five = u.five_hour.unwrap();
+        assert!((five.used_pct - 28.0).abs() < 1e-9);
+        assert_eq!(five.resets_at, 1_791_460_800_000);
+        assert!((u.seven_day.unwrap().used_pct - 18.0).abs() < 1e-9);
+
+        // Over the limit: shown full. Nonsense: dropped.
+        let over = json!({ "rate_limit_info": { "unifiedWindows": {
+            "five_hour": { "utilization": 1.4, "resetsAt": 1791460800 },
+            "seven_day": { "utilization": -3, "resetsAt": 1791781200 }
+        } } });
+        let u = parse_plan(&over).unwrap();
+        assert_eq!(u.five_hour.unwrap().used_pct, 100.0);
+        assert!(u.seven_day.is_none());
+
+        // An event without windows (API plans) says nothing.
+        assert!(parse_plan(&json!({ "rate_limit_info": { "status": "allowed" } })).is_none());
     }
 
     #[test]

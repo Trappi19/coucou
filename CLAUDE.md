@@ -3,7 +3,8 @@
 Windows-only fork of Coucou. Mochi, a small animated character living at the top of the screen, shows AI coding agent sessions (Claude Code, Gemini CLI, Antigravity and more) and a few integrations, and lets the user approve, answer, chat and drop files from the island.
 
 ## Where things are
-- `src-tauri/` — Rust backend (Tauri 2): island window, named pipe server, chat (Claude Code CLI on the user's subscription in `claude_code.rs`, or the API in `claude.rs`), pollers. Everything Win32 lives in `src/platform/windows.rs`.
+- `src-tauri/` — Rust backend (Tauri 2): island window, named pipe server, chat (Claude Code CLI on the user's subscription in `claude_code.rs` — which also reads the plan usage from its `rate_limit_event` —, the API in `claude.rs`, or a local OpenAI-compatible server in `local_chat.rs`), pollers (`integrations.rs`, GitHub pulse/activity parsing in `github.rs`), global shortcuts (`shortcuts.rs`). Everything Win32 lives in `src/platform/windows.rs`.
+- Ported from upstream Coucou 0.2.0 (`upstream` remote, `windows/` folder): `github.rs`, `core/github.ts`, `views/github.ts` almost as is; plan usage, local models and shortcuts rewritten smaller for this fork.
 - `hook/` — `coucou-hook.exe`, the relay Claude Code runs on every hook event (named pipe `\\.\pipe\coucou-<sid>`).
 - `src/` — TypeScript front end, no framework: `mochi/` (Canvas 2D), `island/`, `views/`, `settings/`.
 - `sounds/` — the 28 WAV sounds, served/copied by `vite.config.ts`.

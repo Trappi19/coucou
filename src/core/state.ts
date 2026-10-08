@@ -2,6 +2,7 @@
 
 import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
 import type { EyeShape } from "../mochi/engine";
+import type { PlanUsage } from "./plan";
 
 export type AgentSource = "claudeCode" | "n8n" | "agent";
 export type PillBadge = "approval" | "finished" | "error";
@@ -51,7 +52,7 @@ export interface ChatSession {
   updated: number;
 }
 
-export type ChatBackend = "claudeCode" | "api";
+export type ChatBackend = "claudeCode" | "api" | "local";
 
 export type PromptContext =
   | { kind: "window"; appName: string; title: string; url?: string }
@@ -111,10 +112,13 @@ export interface Settings {
   hooksInstalled: boolean;
   /** Claude model used by the chat with an API key. */
   model: string;
-  /** Who answers the chat: the Claude subscription through Claude Code, or an API key. */
+  /** Who answers the chat: the Claude subscription (Claude Code), an API key, or a local model. */
   chatBackend: ChatBackend;
   /** Claude Code model alias; empty = the account's default. */
   cliModel: string;
+  /** Local model server (Ollama, LM Studio…) and the model picked on it. */
+  localUrl: string;
+  localModel: string;
   /** Compact opens when the cursor rests on it, no click needed. */
   openOnHover: boolean;
   /** An open conversation folds like any other view instead of waiting for ⌃ / Esc. */
@@ -122,6 +126,10 @@ export interface Settings {
   /** Island zoom picked by the user (1 = original size), compact and open separately. */
   compactScale: number;
   expandedScale: number;
+  /** Global shortcuts the user changed (shortcuts.rs); the others keep their default keys. */
+  shortcuts: Record<string, { keys: string; enabled: boolean }>;
+  /** How often the Claude plan usage is fetched in the background, in minutes. 0 = never. */
+  planRefreshMinutes: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -138,10 +146,14 @@ export const DEFAULT_SETTINGS: Settings = {
   model: "claude-opus-5",
   chatBackend: "claudeCode",
   cliModel: "",
+  localUrl: "",
+  localModel: "",
   openOnHover: false,
   foldDuringChat: false,
   compactScale: 1,
   expandedScale: 1,
+  shortcuts: {},
+  planRefreshMinutes: 5,
 };
 
 type Listener = () => void;
@@ -188,6 +200,12 @@ class AppState {
 
   /** A newer local build ready to install, if any. */
   update: { version: string; builtAt: string | null } | null = null;
+
+  /** Claude plan usage (5 hours / week), from Claude Code's own reports. */
+  planUsage: PlanUsage | null = null;
+  /** The ↻ on the plan card is asking Claude Code. */
+  planRefreshing = false;
+  planError: string | null = null;
 
   /** Resize mode: the island holds still while the user sets its size. */
   resizing = false;
@@ -322,6 +340,11 @@ class AppState {
   }
 
   get usesClaudeCode(): boolean {
+    return this.settings.chatBackend === "claudeCode";
+  }
+
+  /** Turns can be stopped mid-answer (Claude Code, a local model); an API call can't. */
+  get chatCanStop(): boolean {
     return this.settings.chatBackend !== "api";
   }
 

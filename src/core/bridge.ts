@@ -103,6 +103,10 @@ export const Bridge = {
   chatOpen: (path: string, sessionId: string | null) =>
     callOrThrow<{ role: "user" | "assistant"; content: string }[]>("chat_open", { path, sessionId }),
   claudeCodeStatus: () => call<ClaudeCodeStatus>("claude_code_status"),
+  /** The chat models a local server (Ollama, LM Studio…) has. */
+  localModels: (url: string) => callOrThrow<string[]>("local_models", { url }),
+  /** Fresh plan usage from Claude Code (a one-word turn on Haiku). */
+  planRefresh: () => callOrThrow<unknown>("plan_refresh"),
   /** Copies a dropped file into the inbox. */
   ingestFile: (path: string) => callOrThrow<DroppedFile>("ingest_file", { path }),
   /** Only ever tells you whether a key exists — never its value. */
@@ -118,6 +122,10 @@ export const Bridge = {
 
   // ── Integrations ──────────────────────────────────────────────────────────
   refreshIntegration: (id: string) => call<void>("refresh_integration", { id }),
+  /** Each global shortcut, its keys and whether Windows accepted them. */
+  shortcutsStatus: () => call<ShortcutStatus[]>("shortcuts_status"),
+  /** The GitHub card came up: fetch that section again if it is stale. */
+  githubRefresh: (section: "pulse" | "activity") => call<void>("github_refresh", { section }),
   /** Opens the configured n8n instance in the browser. */
   openN8n: () => call<void>("open_n8n"),
 
@@ -153,6 +161,15 @@ export interface UpdateStatus {
   current: string;
   folder: string;
   available: UpdateInfo | null;
+}
+
+export interface ShortcutStatus {
+  id: string;
+  label: string;
+  keys: string;
+  defaultKeys: string;
+  enabled: boolean;
+  status: "active" | "off" | "inUse" | "duplicate" | "invalid";
 }
 
 export interface ClaudeCodeStatus {

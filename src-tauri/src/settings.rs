@@ -27,6 +27,11 @@ pub struct Settings {
     /// Claude Code model alias ("opus", "sonnet"…). Empty = the account's default.
     #[serde(default)]
     pub cli_model: String,
+    /// `BACKEND_LOCAL`: the model server's address (Ollama, LM Studio…) and model.
+    #[serde(default)]
+    pub local_url: String,
+    #[serde(default)]
+    pub local_model: String,
     /// Compact opens by itself when the cursor rests on it, no click needed.
     #[serde(default)]
     pub open_on_hover: bool,
@@ -39,6 +44,16 @@ pub struct Settings {
     pub compact_scale: f64,
     #[serde(default = "default_scale")]
     pub expanded_scale: f64,
+    /// Global shortcuts the user changed; the others keep their default keys.
+    #[serde(default)]
+    pub shortcuts: crate::shortcuts::Bindings,
+    /// How often the Claude plan usage is fetched in the background, in minutes. 0 = never.
+    #[serde(default = "default_plan_refresh")]
+    pub plan_refresh_minutes: u32,
+}
+
+fn default_plan_refresh() -> u32 {
+    5
 }
 
 fn default_scale() -> f64 {
@@ -47,6 +62,7 @@ fn default_scale() -> f64 {
 
 pub const BACKEND_CLAUDE_CODE: &str = "claudeCode";
 pub const BACKEND_API: &str = "api";
+pub const BACKEND_LOCAL: &str = "local";
 
 fn default_model() -> String {
     crate::claude::DEFAULT_MODEL.to_string()
@@ -75,10 +91,14 @@ impl Default for Settings {
             model: default_model(),
             chat_backend: default_backend(),
             cli_model: String::new(),
+            local_url: String::new(),
+            local_model: String::new(),
             open_on_hover: false,
             fold_during_chat: false,
             compact_scale: default_scale(),
             expanded_scale: default_scale(),
+            shortcuts: Default::default(),
+            plan_refresh_minutes: default_plan_refresh(),
         }
     }
 }

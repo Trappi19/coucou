@@ -437,15 +437,16 @@ export function buildPrompt(actions: ViewActions, onHeightChange: () => void): V
         stickToBottom = true;
       }
 
-      // Claude Code turns can be stopped; an API call just has to finish.
-      const mode = pending && claudeCode ? "stop" : "send";
+      // Claude Code and local turns can be stopped; an API call just has to finish.
+      const canStop = State.chatCanStop;
+      const mode = pending && canStop ? "stop" : "send";
       if (mode !== sendMode) {
         sendMode = mode;
         clear(send);
         send.append(mode === "stop" ? svg(ICONS.stop, 10) : svg(ICONS.arrowUp, 11));
         send.title = mode === "stop" ? "Stop" : "Send";
       }
-      send.disabled = pending && !claudeCode;
+      send.disabled = pending && !canStop;
 
       input.placeholder = State.chatHistory.length === 0 ? "Ask me anything…" : "Continue…";
       if (input.value !== State.chatDraft && document.activeElement !== input) {

@@ -3,15 +3,18 @@
 mod claude;
 mod claude_code;
 mod files;
+mod github;
 mod hooks;
 mod integrations;
 mod island;
+mod local_chat;
 mod log;
 mod notes;
 mod pipe;
 mod platform;
 mod secrets;
 mod settings;
+mod shortcuts;
 mod tray;
 mod updates;
 
@@ -25,6 +28,7 @@ use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
 
 use claude::{Chat, ChatContext, ChatReply};
 use claude_code::CliChat;
+use local_chat::LocalChat;
 use files::DroppedFile;
 use hooks::{HookPreview, HookStatus};
 use island::{PollGate, ScreenInfo};
@@ -65,13 +69,17 @@ fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
 
 #[tauri::command]
 fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
-    let (screen_changed, autostart_changed) = {
+    let (screen_changed, autostart_changed, shortcuts_changed) = {
         let mut current = shared.settings.lock().unwrap();
         let screen_changed = current.screen != settings.screen;
         let autostart_changed = current.autostart != settings.autostart;
+        let shortcuts_changed = current.shortcuts != settings.shortcuts;
         *current = settings.clone();
-        (screen_changed, autostart_changed)
+        (screen_changed, autostart_changed, shortcuts_changed)
     };
+    if shortcuts_changed {
+        shortcuts::apply(&app, &settings.shortcuts);
+    }
     if let Err(err) = settings::save(&settings) {
         eprintln!("[coucou] could not save settings: {err}");
     }
@@ -86,6 +94,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
         island::apply_geometry(&app, &settings.screen, collapsed);
     }
+    integrations::settings_saved(&app, &settings.active_integrations);
     // Keep the other window in step (island ⇄ settings window).
     let _ = app.emit("settings-changed", settings);
 }
@@ -257,35 +266,44 @@ fn approval_decline(app: AppHandle, request_id: String) {
 
 // ── Chat, files and secrets ───────────────────────────────────────────────────
 
-/// One chat turn, answered by Claude Code (the user's subscription) or the API.
-/// The API key and any file bytes stay on the Rust side.
+/// One chat turn, answered by Claude Code (the user's subscription), the API,
+/// or a model running on this computer. Keys and file bytes stay on the Rust side.
 #[tauri::command]
 async fn chat_send(
     app: AppHandle,
     shared: State<'_, Shared>,
     chat: State<'_, Chat>,
+    local: State<'_, LocalChat>,
     query: String,
     context: Option<ChatContext>,
 ) -> Result<ChatReply, String> {
-    let (backend, model, cli_model) = {
+    let (backend, model, cli_model, local_url, local_model) = {
         let s = shared.settings.lock().unwrap();
-        (s.chat_backend.clone(), s.model.clone(), s.cli_model.clone())
+        (
+            s.chat_backend.clone(),
+            s.model.clone(),
+            s.cli_model.clone(),
+            s.local_url.clone(),
+            s.local_model.clone(),
+        )
     };
-    if backend == settings::BACKEND_API {
-        claude::send(&chat, &model, query, context).await
-    } else {
-        claude_code::send(app, cli_model, query, context).await
+    match backend.as_str() {
+        settings::BACKEND_API => claude::send(&chat, &model, query, context).await,
+        settings::BACKEND_LOCAL => {
+            local_chat::send(app, &local, &local_url, &local_model, query, context).await
+        }
+        _ => claude_code::send(app, cli_model, query, context).await,
     }
 }
 
 /// New conversation. With Claude Code it stays in the current project.
 #[tauri::command]
-fn chat_reset(chat: State<Chat>, cli: State<CliChat>) {
+fn chat_reset(chat: State<Chat>, cli: State<CliChat>, local: State<LocalChat>) {
     chat.reset();
     cli.reset();
+    local.reset();
 }
 
-/// The Stop button: ends the Claude Code turn in flight.
 /// Sends one Claude Code conversation to the Recycle Bin.
 #[tauri::command]
 async fn chat_delete_session(app: AppHandle, path: String, session_id: String) -> Result<(), String> {
@@ -296,9 +314,17 @@ async fn chat_delete_session(app: AppHandle, path: String, session_id: String) -
     .map_err(|e| e.to_string())?
 }
 
+/// The Stop button: ends the turn in flight (Claude Code or a local model).
 #[tauri::command]
-fn chat_cancel(cli: State<CliChat>) {
+fn chat_cancel(cli: State<CliChat>, local: State<LocalChat>) {
     cli.cancel();
+    local.cancel();
+}
+
+/// Settings → a local model server: the chat models it has.
+#[tauri::command]
+async fn local_models(url: String) -> Result<Vec<String>, String> {
+    local_chat::list_models(&url).await
 }
 
 #[tauri::command]
@@ -338,6 +364,14 @@ async fn claude_code_status() -> Result<claude_code::CliStatus, String> {
         .map_err(|e| e.to_string())
 }
 
+/// The ↻ on the plan card: asks Claude Code for fresh usage numbers.
+#[tauri::command]
+async fn plan_refresh(app: AppHandle) -> Result<claude_code::PlanUsage, String> {
+    tauri::async_runtime::spawn_blocking(move || claude_code::refresh_plan(&app))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Copies a dropped file into the inbox and reports its name back.
 #[tauri::command]
 fn ingest_file(path: String) -> Result<DroppedFile, String> {
@@ -351,13 +385,38 @@ fn secret_present(key: String) -> bool {
 }
 
 #[tauri::command]
-fn secret_set(key: String, value: String) -> Result<(), String> {
-    secrets::set(&key, &value)
+fn secret_set(app: AppHandle, key: String, value: String) -> Result<(), String> {
+    let before = (key == "github-token").then(|| secrets::get(&key));
+    secrets::set(&key, &value)?;
+    // A new GitHub token is someone else's pull requests: start over.
+    if let Some(before) = before {
+        if secrets::get(&key) != before {
+            integrations::github_token_changed(&app);
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
-fn secret_clear(key: String) -> Result<(), String> {
-    secrets::clear(&key)
+fn secret_clear(app: AppHandle, key: String) -> Result<(), String> {
+    let had = key == "github-token" && secrets::present(&key);
+    secrets::clear(&key)?;
+    if had {
+        integrations::github_token_changed(&app);
+    }
+    Ok(())
+}
+
+/// Settings → Shortcuts: each action, its keys and whether Windows took them.
+#[tauri::command]
+fn shortcuts_status(app: AppHandle) -> Vec<shortcuts::ActionStatus> {
+    shortcuts::report(&app)
+}
+
+/// The GitHub card was opened: fetch its section again if what it shows is stale.
+#[tauri::command]
+fn github_refresh(section: String) {
+    integrations::github_refresh_if_stale(&section);
 }
 
 /// Opens the configured n8n instance — the URL lives in the Credential Manager.
@@ -394,7 +453,6 @@ fn open_updates_folder() {
     platform::reveal_folder(&dir.to_string_lossy());
 }
 
-/// Lets the island write to the same log as the Rust side.
 #[tauri::command]
 async fn notes_load() -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(notes::load)
@@ -411,6 +469,7 @@ async fn notes_save(json: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Lets the island write to the same log as the Rust side.
 #[tauri::command]
 fn log_line(message: String) {
     log::line(format!("ui  {message}"));
@@ -492,6 +551,8 @@ pub fn run() {
             let _ = app.emit_to(island::WINDOW_LABEL, "tray", "open".to_string());
         }))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .plugin(shortcuts::plugin())
+        .manage(shortcuts::Registry::default())
         .manage(Shared {
             settings: Mutex::new(loaded.clone()),
             gate: gate.clone(),
@@ -499,6 +560,7 @@ pub fn run() {
         .manage(Pending::default())
         .manage(Chat::default())
         .manage(CliChat::default())
+        .manage(LocalChat::default())
         .invoke_handler(tauri::generate_handler![
             boot,
             save_settings,
@@ -523,16 +585,20 @@ pub fn run() {
             chat_send,
             chat_reset,
             chat_cancel,
+            local_models,
             chat_delete_session,
             chat_projects,
             chat_sessions,
             chat_open,
             claude_code_status,
+            plan_refresh,
             ingest_file,
             secret_present,
             secret_set,
             secret_clear,
             refresh_integration,
+            github_refresh,
+            shortcuts_status,
             open_n8n,
             open_settings_window,
             set_paused,
@@ -565,6 +631,7 @@ pub fn run() {
             pipe::start(handle.clone());
             integrations::start(handle.clone());
             updates::start(handle.clone());
+            shortcuts::apply(&handle, &loaded.shortcuts);
             Ok(())
         })
         .run(tauri::generate_context!())

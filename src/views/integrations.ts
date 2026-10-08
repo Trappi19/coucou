@@ -8,6 +8,8 @@ import { h, svg, clear, dot } from "./dom";
 import { ICONS } from "./icons";
 import { State, type AgentTask } from "../core/state";
 import { Bridge } from "../core/bridge";
+import { readActivity, readPulse, readStats } from "../core/github";
+import { githubDetail, githubPulseCard } from "./github";
 
 /** Same shape as the Swift `timeAgo` computed properties. */
 export function timeAgo(value: unknown): string {
@@ -374,8 +376,16 @@ function n8nDetail(task: AgentTask, onBack: () => void): HTMLElement {
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
+/**
+ * How a card comes on screen: `fade` (another pill, the island opening),
+ * `forward` / `back` (its detail opening / closing, sliding that way), or
+ * `none` — the same card with fresh numbers, swapped in without a flicker.
+ */
+export type CardEntrance = "fade" | "forward" | "back" | "none";
+
 export interface IntegrationCardHooks {
   detailOpen: boolean;
+  readonly entrance: CardEntrance;
   openDetail(): void;
   closeDetail(): void;
   openSettings(): void;
@@ -414,6 +424,18 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
     return hooks.detailOpen ? vercelDetail(hooks.closeDetail) : vercelCard(hooks.openDetail);
   }
   if (!hasIntegrationData(task.id)) return idleCard(task, hooks.openSettings);
+
+  // With the pulse in, GitHub gets the Mac's richer card and its lists.
+  if (task.id === "integration_github") {
+    const d = get(task.id);
+    const pulse = readPulse(d);
+    if (pulse) {
+      const animate = hooks.entrance !== "none";
+      return hooks.detailOpen
+        ? githubDetail(pulse, readStats(d), readActivity(d), hooks.closeDetail, animate)
+        : githubPulseCard(pulse, readStats(d), readActivity(d), hooks.openDetail, animate);
+    }
+  }
 
   switch (task.id) {
     case "integration_resend":

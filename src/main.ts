@@ -7,13 +7,17 @@ import { State, type Settings } from "./core/state";
 import { Island } from "./island/island";
 import { registerHookHandlers } from "./island/hooks";
 import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
+import { registerShortcutHandlers } from "./island/shortcuts";
 import { streamReply } from "./views/chat";
+import { restorePlanUsage, setPlanUsage, startPlanAutoRefresh } from "./views/usage";
 
 /** Whether whoever answers the chat is set up, for the badge in the island's settings. */
 async function refreshChatReady() {
   if (State.usesClaudeCode) {
     const cli = await Bridge.claudeCodeStatus();
     State.chatReady = (cli?.found ?? false) && (cli?.loggedIn ?? false);
+  } else if (State.settings.chatBackend === "local") {
+    State.chatReady = State.settings.localModel !== "";
   } else {
     State.chatReady = (await Bridge.secretPresent("anthropic-api-key")) ?? false;
   }
@@ -50,6 +54,11 @@ async function main() {
 
   // The answer as Claude Code writes it.
   await onEvent<{ text: string; reset: boolean }>("chat-delta", (delta) => streamReply(delta));
+
+  // Where the Claude plan stands, reported by Claude Code with each turn.
+  restorePlanUsage();
+  await onEvent<unknown>("plan-usage", (usage) => setPlanUsage(usage));
+  startPlanAutoRefresh();
 
   void refreshChatReady();
 
@@ -100,7 +109,8 @@ async function main() {
 
   // The settings window writes preferences; apply them here without a restart.
   await onEvent<Settings>("settings-changed", (s) => {
-    const backendChanged = s.chatBackend !== State.settings.chatBackend;
+    const backendChanged =
+      s.chatBackend !== State.settings.chatBackend || s.localModel !== State.settings.localModel;
     State.settings = { ...State.settings, ...s };
     island.applySettings();
     State.loadIntegrationTasks();
@@ -110,6 +120,7 @@ async function main() {
 
   registerHookHandlers(island);
   registerIntegrationHandlers(island);
+  registerShortcutHandlers(island);
 
   island.launch();
 

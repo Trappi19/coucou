@@ -11,8 +11,9 @@ import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
 import { buildPrompt } from "./chat";
 import { buildNotes } from "./notes";
 import { buildSessions } from "./sessions";
+import { buildPlanPill, buildUsage } from "./usage";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
-import { renderIntegrationCard, type IntegrationCardHooks } from "./integrations";
+import { renderIntegrationCard, type CardEntrance, type IntegrationCardHooks } from "./integrations";
 
 export interface ViewActions {
   setView(v: IslandViewName): void;
@@ -110,6 +111,9 @@ export function buildHeader(actions: ViewActions): ViewHost {
     svg(ICONS.chevronUp, 14, { stroke: 2.4 }),
   );
 
+  // "Claude 28%": the plan's usage, always in sight while the island is open.
+  const planPill = buildPlanPill(actions);
+
   function go(v: IslandViewName) {
     actions.blip();
     actions.setView(v);
@@ -119,13 +123,14 @@ export function buildHeader(actions: ViewActions): ViewHost {
     "div",
     { id: "header" },
     h("div", { class: "tabs" }, tabHome, tabChat, tabHistory, tabNotes, tabDrop),
-    h("div", { class: "header-actions" }, gearBtn, soundBtn, foldBtn),
+    h("div", { class: "header-actions" }, planPill.el, gearBtn, soundBtn, foldBtn),
   );
 
   return {
     el,
     sync() {
       const v = State.view;
+      planPill.sync();
       tabHome.classList.toggle("on", v === "overview" || v === "empty");
       tabChat.classList.toggle("on", v === "prompt");
       tabHistory.classList.toggle("on", v === "sessions");
@@ -170,10 +175,16 @@ function buildOverview(actions: ViewActions): ViewHost {
   let lastFocus: string | null = null;
   let mode: "ticker" | "card" | null = null;
   let cardKey = "";
+  /** Which card (pill + detail or not) was last drawn, to tell an entrance from a refresh. */
+  let cardIdentity = "";
+  let entrance: CardEntrance = "fade";
 
   const hooks: IntegrationCardHooks = {
     get detailOpen() {
       return detailOpen;
+    },
+    get entrance() {
+      return entrance;
     },
     openDetail() {
       detailOpen = true;
@@ -190,6 +201,13 @@ function buildOverview(actions: ViewActions): ViewHost {
 
   return {
     el,
+    show() {
+      // Each time the island opens on the overview, the card comes in again
+      // (on the next frame: show() runs after this view's sync).
+      cardKey = "";
+      cardIdentity = "";
+      State.notify();
+    },
     tick(nowMs: number) {
       if (mode === "ticker") ticker.tick(nowMs);
     },
@@ -237,8 +255,18 @@ function buildOverview(actions: ViewActions): ViewHost {
         if (key !== cardKey) {
           cardKey = key;
           mode = "card";
+          // New numbers for the card already there: swapped in quietly. Another
+          // card, or its detail opening or closing: it comes in, sliding the way
+          // the user is going.
+          const identity = `${task.id}|${detailOpen}`;
+          entrance = identity === cardIdentity ? "none"
+            : cardIdentity.startsWith(`${task.id}|`) ? (detailOpen ? "forward" : "back")
+            : "fade";
+          cardIdentity = identity;
+          const cardEl = renderIntegrationCard(task, hooks);
+          if (entrance !== "none") cardEl.classList.add(`enter-${entrance}`);
           clear(leftBody);
-          leftBody.append(renderIntegrationCard(task, hooks));
+          leftBody.append(cardEl);
         }
       }
 
@@ -528,7 +556,10 @@ function buildSettings(actions: ViewActions): ViewHost {
       clear(apiBadge);
       apiBadge.append(
         dot(State.chatReady ? "#22C55E" : "#F4505E", 6),
-        h("span", { text: State.usesClaudeCode ? "Chat · Claude plan" : "Chat · API" }),
+        h("span", {
+          text: State.usesClaudeCode ? "Chat · Claude plan"
+            : State.settings.chatBackend === "local" ? "Chat · local model" : "Chat · API",
+        }),
       );
     },
   };
@@ -601,6 +632,7 @@ export function buildViews(
   map.set("settings", buildSettings(actions));
   map.set("resize", buildResize());
   map.set("update", buildUpdate(actions));
+  map.set("usage", buildUsage());
   map.set("prompt", buildPrompt(actions, onChatHeightChange));
   map.set("sessions", buildSessions(actions));
   map.set("notes", buildNotes(actions));

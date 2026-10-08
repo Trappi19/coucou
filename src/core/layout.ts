@@ -25,6 +25,7 @@ export type IslandViewName =
   | "settings"
   | "resize"
   | "update"
+  | "usage"
   | "greeting";
 
 export type BotStateName =
@@ -98,6 +99,8 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   resize: { height: 160, botX: 70, botY: null, botDiameter: 62, agentMode: "none" },
   // A newer local build is ready: install it or later.
   update: { height: 160, botX: 62, botY: null, botDiameter: 58, agentMode: "column" },
+  // Claude plan usage: the 5-hour and weekly gauges.
+  usage: { height: 160, botX: 62, botY: null, botDiameter: 56, agentMode: "none" },
   greeting: { height: 150, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
 };
 

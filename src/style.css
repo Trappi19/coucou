@@ -2460,3 +2460,435 @@ input[type="range"]::-webkit-slider-thumb {
 .int-card.detail {
   padding-top: 8px;
 }
+
+/* ── Claude plan usage (from upstream's usage view) ────────────────────── */
+
+/* Compact: the percentage between Mochi and the mini grid. */
+#plan-compact {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font: 600 11px var(--font);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out;
+}
+
+.header-actions .plan-pill {
+  --plan: #6b7079;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  margin-right: -6px;
+  border: 1px solid color-mix(in srgb, var(--plan) 14%, transparent);
+  border-radius: 999px;
+  background: #0e0f11;
+  color: var(--dim-3);
+  font: 600 10px var(--font);
+  line-height: 12px;
+  white-space: nowrap;
+  cursor: default;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.header-actions .plan-pill:hover,
+.header-actions .plan-pill.active {
+  background: color-mix(in srgb, var(--plan) 18%, transparent);
+  border-color: color-mix(in srgb, var(--plan) 55%, transparent);
+  color: color-mix(in srgb, var(--plan) 70%, white);
+}
+
+.plan-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.plan-card {
+  position: relative;
+  z-index: 1;
+  padding-top: 14px;
+}
+
+.plan-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 40px 0 116px;
+  white-space: nowrap;
+}
+
+.plan-head > * {
+  flex: 0 0 auto;
+}
+
+.plan-title {
+  font: 600 12px var(--font);
+  color: var(--ink);
+}
+
+.plan-head > .plan-sub {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 400 11px var(--font);
+  color: var(--dim-2);
+}
+
+.plan-head > .plan-sub.err {
+  color: var(--red-text);
+}
+
+.plan-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 16px 0 116px;
+}
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 400 11.5px var(--font);
+  white-space: nowrap;
+}
+
+.plan-label {
+  flex: 0 0 48px;
+  color: var(--dim-3);
+}
+
+.plan-bar {
+  flex: 0 0 150px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.plan-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease-out;
+}
+
+.plan-pct {
+  flex: 0 0 34px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #c5c8cd;
+}
+
+.plan-reset-icon {
+  display: inline-flex;
+  margin-left: 4px;
+  color: var(--dim-3);
+}
+
+.plan-reset {
+  font-size: 10.5px;
+  color: var(--dim-3);
+}
+
+.plan-none {
+  color: var(--dim-3);
+}
+
+.plan-hint {
+  padding: 10px 16px 0 116px;
+  font: 400 10.5px var(--font);
+  color: var(--dim-4);
+}
+
+.plan-refresh {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+}
+
+.plan-refresh:hover {
+  color: var(--ink);
+}
+
+.plan-refresh.spinning svg {
+  animation: plan-spin 0.9s linear infinite;
+}
+
+@keyframes plan-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── GitHub pulse card and contribution grid (from upstream) ────────────── */
+
+.gh-spark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: 400 11px var(--font);
+  color: var(--dim-2);
+  white-space: nowrap;
+  cursor: default;
+  min-width: 0;
+}
+
+.gh-mini {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.gh-mini i,
+.gh-cell {
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+  flex: 0 0 auto;
+}
+
+.gh-stat {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: default;
+}
+
+.gh-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.gh-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: 600 12px var(--font);
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: default;
+  flex: 0 0 auto;
+}
+
+.gh-head-right {
+  margin-left: auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: 400 11px var(--font);
+  color: var(--dim-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  cursor: default;
+}
+
+.gh-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 60px; /* three 20 px rows; the rest scrolls */
+  overflow-y: auto;
+  margin-top: 4px;
+  scrollbar-width: none;
+}
+
+.gh-list::-webkit-scrollbar {
+  display: none;
+}
+
+.gh-list.fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 80%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 80%, transparent 100%);
+}
+
+.gh-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  flex: 0 0 20px;
+  padding: 0 4px 0 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  text-align: left;
+  cursor: default;
+  min-width: 0;
+}
+
+.gh-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.gh-gap {
+  width: 5px;
+  flex: 0 0 5px;
+}
+
+.gh-ref {
+  font: 400 10.5px var(--font);
+  color: #9398a1;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.gh-title {
+  font: 400 11px var(--font);
+  color: #c5c8cd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.gh-draft {
+  font: 400 9.5px var(--font);
+  color: var(--dim-3);
+  flex: 0 0 auto;
+}
+
+.gh-word {
+  margin-left: auto;
+  padding-left: 4px;
+  font: 400 10px var(--font);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.gh-empty {
+  font: 400 10.5px var(--font);
+  color: var(--dim-3);
+  padding-top: 8px;
+}
+
+.gh-grid {
+  display: flex;
+  gap: 1.5px;
+  padding-top: 5px;
+}
+
+.gh-week {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5px;
+}
+
+.gh-cell.empty {
+  background: transparent;
+}
+
+.gh-streak {
+  font: 600 10px var(--font);
+  color: #f5a524;
+  white-space: nowrap;
+}
+
+.gh-detail-head .gh-streak {
+  margin-left: 6px;
+}
+
+/* ── Card entrances ─────────────────────────────────────────────────────────
+   When a card comes on screen (another pill, the island opening, a detail
+   opening or closing — views.ts sets enter-*), its pieces fade in one after
+   the other, like the words of an answer. A card redrawn with fresh numbers
+   has no enter-* class and stays still. */
+
+.int-card[class*="enter-"] > *,
+.int-card[class*="enter-"] :is(.int-rows, .int-stats, .gh-list) > * {
+  animation: card-rise 0.42s cubic-bezier(0.22, 0.9, 0.32, 1) both;
+}
+
+/* Detail opening: everything slides in from the right; closing: from the left. */
+.int-card.enter-forward > *,
+.int-card.enter-forward :is(.int-rows, .int-stats, .gh-list) > * {
+  animation-name: card-from-right;
+}
+
+.int-card.enter-back > *,
+.int-card.enter-back :is(.int-rows, .int-stats, .gh-list) > * {
+  animation-name: card-from-left;
+}
+
+/* The header first, then each row 50 ms after the one above it. Rows that set
+   their own delay (staggered() in motion.ts) keep it. */
+.int-card[class*="enter-"] > :nth-child(2) { animation-delay: 60ms; }
+.int-card[class*="enter-"] > :nth-child(3) { animation-delay: 120ms; }
+.int-card[class*="enter-"] :is(.int-rows, .int-stats) > :nth-child(1) { animation-delay: 90ms; }
+.int-card[class*="enter-"] :is(.int-rows, .int-stats) > :nth-child(2) { animation-delay: 140ms; }
+.int-card[class*="enter-"] :is(.int-rows, .int-stats) > :nth-child(3) { animation-delay: 190ms; }
+.int-card[class*="enter-"] :is(.int-rows, .int-stats) > :nth-child(4) { animation-delay: 240ms; }
+.int-card[class*="enter-"] :is(.int-rows, .int-stats) > :nth-child(5) { animation-delay: 290ms; }
+
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes card-from-right {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes card-from-left {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The week's squares light up one by one, with a little pop. */
+.int-card[class*="enter-"] .gh-mini i {
+  animation: square-pop 0.36s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+
+@keyframes square-pop {
+  from { opacity: 0; transform: scale(0.3); }
+  to { opacity: 1; transform: none; }
+}
+
+.gh-week-count {
+  margin-left: 4px;
+  font: 600 10px var(--font);
+  color: #39d353;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The contribution grid fills in as a diagonal wave (delays set in github.ts). */
+.int-card[class*="enter-"] .gh-cell:not(.empty) {
+  animation: cell-in 0.45s ease-out both;
+}
+
+@keyframes cell-in {
+  from { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+
+/* The activity header's text cross-fades when a day is hovered. */
+.gh-head-right.swap {
+  animation: reply-fade 0.25s ease-out both;
+}
+
+.gh-streak,
+.gh-spark > span,
+.gh-week-count {
+  font-variant-numeric: tabular-nums;
+}
