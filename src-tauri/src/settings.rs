@@ -53,6 +53,9 @@ pub struct Settings {
     /// What's playing shows in the small island, with a music tab.
     #[serde(default = "default_true")]
     pub music_widget: bool,
+    /// The time, and the battery on a laptop, next to the plan.
+    #[serde(default = "default_true")]
+    pub clock_battery: bool,
 }
 
 fn default_true() -> bool {
@@ -107,6 +110,7 @@ impl Default for Settings {
             shortcuts: Default::default(),
             plan_refresh_minutes: default_plan_refresh(),
             music_widget: true,
+            clock_battery: true,
         }
     }
 }

@@ -122,6 +122,8 @@ export const Bridge = {
 
   // ── Integrations ──────────────────────────────────────────────────────────
   refreshIntegration: (id: string) => call<void>("refresh_integration", { id }),
+  /** Laptop battery; null on a desktop PC. */
+  batteryStatus: () => call<{ percent: number; charging: boolean } | null>("battery_status"),
   /** The music tab: play/pause ("toggle"), "next", "previous", or "seek" to positionMs. */
   mediaControl: (action: "toggle" | "next" | "previous" | "seek", positionMs?: number) =>
     callOrThrow<void>("media_control", { action, positionMs: positionMs ?? null }),

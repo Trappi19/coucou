@@ -2475,13 +2475,93 @@ input[type="range"]::-webkit-slider-thumb {
   font-variant-numeric: tabular-nums;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.25s ease-in-out, left 0.55s cubic-bezier(0.3, 1.25, 0.4, 1);
+  white-space: nowrap;
+  transition: opacity 0.25s ease-in-out, left 0.55s cubic-bezier(0.3, 1.25, 0.4, 1),
+    transform 0.55s cubic-bezier(0.3, 1.25, 0.4, 1);
 }
 
-/* Music in the middle: the plan slides right, next to the mini grid. Both
-   positions follow the island as it widens, so the slide rides the spring. */
+/* Music in the middle: the cluster slides right, its right edge against the
+   mini grid. Both positions follow the island as it widens, so the slide
+   rides the spring. */
 #plan-compact.aside {
-  left: calc(100% - 84px);
+  left: calc(100% - 64px);
+  transform: translate(-100%, -50%);
+}
+
+/* "● 62%  ▮ 84%  14:32" */
+#plan-compact {
+  gap: 10px;
+}
+
+.sc-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sc-clock {
+  color: #c5c8cd;
+  font-weight: 500;
+}
+
+/* A tiny battery: outline, nub, fill to the level; a glow while charging. */
+.bat {
+  --bat: #c5c8cd;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.bat-body {
+  position: relative;
+  width: 15px;
+  height: 8px;
+  padding: 1px;
+  border: 1px solid color-mix(in srgb, var(--bat) 65%, transparent);
+  border-radius: 2.5px;
+  display: flex;
+}
+
+.bat::after {
+  content: "";
+  width: 1.5px;
+  height: 3px;
+  border-radius: 0 1px 1px 0;
+  background: color-mix(in srgb, var(--bat) 65%, transparent);
+}
+
+.bat-fill {
+  height: 100%;
+  border-radius: 1px;
+  background: var(--bat);
+  transition: width 0.6s ease-out;
+}
+
+.bat.charging .bat-fill {
+  animation: bat-charge 2.4s ease-in-out infinite;
+}
+
+@keyframes bat-charge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Open island: battery and time, quiet, before the plan pill. */
+.header-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: -4px;
+  font: 500 10.5px var(--font);
+  color: var(--dim-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hs-battery {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .header-actions .plan-pill {

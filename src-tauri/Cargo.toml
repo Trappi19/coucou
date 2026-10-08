@@ -31,6 +31,8 @@ windows = { version = "0.61", features = [
   "Media_Control",
   "Storage_Streams",
   "Win32_System_WinRT",
+  # Laptop battery, next to the plan in the small island.
+  "Win32_System_Power",
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Security_Authorization",

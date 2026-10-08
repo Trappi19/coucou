@@ -408,6 +408,18 @@ fn secret_clear(app: AppHandle, key: String) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Serialize)]
+struct BatteryInfo {
+    percent: u8,
+    charging: bool,
+}
+
+/// Laptop battery for the small island; null on a desktop PC.
+#[tauri::command]
+fn battery_status() -> Option<BatteryInfo> {
+    platform::battery().map(|(percent, charging)| BatteryInfo { percent, charging })
+}
+
 /// The music tab: play/pause, next, previous, seek — on whatever is playing.
 #[tauri::command]
 async fn media_control(action: String, position_ms: Option<u64>) -> Result<(), String> {
@@ -611,6 +623,7 @@ pub fn run() {
             github_refresh,
             shortcuts_status,
             media_control,
+            battery_status,
             open_n8n,
             open_settings_window,
             set_paused,

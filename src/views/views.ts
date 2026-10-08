@@ -13,6 +13,7 @@ import { buildNotes } from "./notes";
 import { buildSessions } from "./sessions";
 import { buildPlanPill, buildUsage } from "./usage";
 import { buildMusic } from "./music";
+import { buildHeaderStatus } from "./status";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
 import { renderIntegrationCard, type CardEntrance, type IntegrationCardHooks } from "./integrations";
 
@@ -113,8 +114,10 @@ export function buildHeader(actions: ViewActions): ViewHost {
     svg(ICONS.chevronUp, 14, { stroke: 2.4 }),
   );
 
-  // "Claude 28%": the plan's usage, always in sight while the island is open.
+  // "Claude 28%": the plan's usage, always in sight while the island is open,
+  // with the battery (laptops) and the time just before it.
   const planPill = buildPlanPill(actions);
+  const headerStatus = buildHeaderStatus();
 
   function go(v: IslandViewName) {
     actions.blip();
@@ -125,7 +128,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
     "div",
     { id: "header" },
     h("div", { class: "tabs" }, tabHome, tabChat, tabHistory, tabNotes, tabMusic, tabDrop),
-    h("div", { class: "header-actions" }, planPill.el, gearBtn, soundBtn, foldBtn),
+    h("div", { class: "header-actions" }, headerStatus.el, planPill.el, gearBtn, soundBtn, foldBtn),
   );
 
   return {
@@ -133,6 +136,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
     sync() {
       const v = State.view;
       planPill.sync();
+      headerStatus.sync();
       tabHome.classList.toggle("on", v === "overview" || v === "empty");
       tabChat.classList.toggle("on", v === "prompt");
       tabHistory.classList.toggle("on", v === "sessions");

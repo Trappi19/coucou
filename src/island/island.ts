@@ -9,7 +9,6 @@ import {
   islandSize,
   type IslandMode, type IslandViewName,
 } from "../core/layout";
-import { dominantPct, planColor } from "../core/plan";
 import { SCALE_MAX, canvasDpr, clampScale, setRenderScale } from "../core/scale";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
@@ -19,8 +18,9 @@ import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from ".
 import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
-import { dot, h } from "../views/dom";
+import { h } from "../views/dom";
 import { buildMusicCompact, musicShown, type MusicCompact } from "../views/music";
+import { buildStatusCluster, type StatusCluster } from "../views/status";
 import { IslandStateMachine } from "./fsm";
 import { ResizeController, type ResizeTarget } from "./resize";
 
@@ -54,7 +54,8 @@ export class Island {
   private botGlow!: HTMLElement;
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
-  /** The plan percentage shown in compact. */
+  /** The plan, battery and time shown in compact (views/status.ts). */
+  private status!: StatusCluster;
   private planCompact!: HTMLElement;
   /** What's playing, in compact (views/music.ts). */
   private musicCompact!: MusicCompact;
@@ -216,7 +217,8 @@ export class Island {
     this.botCanvas = h("canvas", { id: "bot-canvas" });
     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
     this.miniGrid = h("div", { id: "mini-grid" });
-    this.planCompact = h("div", { id: "plan-compact" });
+    this.status = buildStatusCluster();
+    this.planCompact = this.status.el;
     this.musicCompact = buildMusicCompact();
     this.countdown = h("div", { id: "countdown" });
 
@@ -1143,26 +1145,19 @@ export class Island {
       }
     }
 
-    // Compact keeps the plan in sight: "● 28%" between Mochi and the grid.
-    const pct = dominantPct(State.planUsage);
-    const showPlan = State.mode === "compact" && State.usesClaudeCode && pct != null;
-    this.planCompact.style.opacity = showPlan ? "1" : "0";
-    // Music in the middle: the plan slides over to the right, and back when it stops.
+    // Compact keeps the plan, the battery and the time in sight, between Mochi
+    // and the grid ("● 28%  ▮ 84%  14:32").
+    const shown = this.status.sync(State.usesClaudeCode);
+    this.planCompact.style.opacity = State.mode === "compact" && shown ? "1" : "0";
+    // Music in the middle: the cluster slides over to the right as one piece,
+    // and the music takes the room it leaves.
     const music = musicShown();
     this.planCompact.classList.toggle("aside", music);
+    this.musicCompact.el.style.right = `${66 + (shown ? this.planCompact.offsetWidth + 10 : 0)}px`;
     this.musicCompact.sync();
     if (music !== this.musicWasShown) {
       this.musicWasShown = music;
       if (State.mode === "compact") this.animateGeometry(!music);
-    }
-    if (showPlan) {
-      const label = `${Math.round(pct)}%`;
-      if (this.planCompact.dataset.label !== label) {
-        this.planCompact.dataset.label = label;
-        const color = planColor(pct);
-        this.planCompact.replaceChildren(dot(color, 5), h("span", { text: label }));
-        this.planCompact.style.color = color;
-      }
     }
 
     syncMiniBotStates(State.tasks);

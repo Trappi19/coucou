@@ -222,6 +222,20 @@ pub fn current_user_sid() -> Option<String> {
     }
 }
 
+// ── Battery ───────────────────────────────────────────────────────────────────
+
+/// (percent, plugged in) on a laptop; None on a desktop, or when Windows
+/// doesn't know (BatteryFlag 128 = no system battery, 255 = unknown).
+pub fn battery() -> Option<(u8, bool)> {
+    use ::windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+    let mut status = SYSTEM_POWER_STATUS::default();
+    unsafe { GetSystemPowerStatus(&mut status).ok()? };
+    if status.BatteryFlag == 128 || status.BatteryFlag == 255 || status.BatteryLifePercent > 100 {
+        return None;
+    }
+    Some((status.BatteryLifePercent, status.ACLineStatus == 1))
+}
+
 // ── Cursor ────────────────────────────────────────────────────────────────────
 
 /// The 60 Hz poll reads the cursor and flips click-through from it.

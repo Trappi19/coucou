@@ -133,6 +133,8 @@ export interface Settings {
   planRefreshMinutes: number;
   /** What's playing shows in the small island (and the music tab is there). */
   musicWidget: boolean;
+  /** The time, and the battery on a laptop, next to the plan. */
+  clockBattery: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -158,6 +160,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shortcuts: {},
   planRefreshMinutes: 5,
   musicWidget: true,
+  clockBattery: true,
 };
 
 type Listener = () => void;
@@ -204,6 +207,9 @@ class AppState {
 
   /** A newer local build ready to install, if any. */
   update: { version: string; builtAt: string | null } | null = null;
+
+  /** Laptop battery; null on a desktop PC. */
+  battery: { percent: number; charging: boolean } | null = null;
 
   /** What's playing (Spotify, a browser…), null when nothing. */
   media: MediaInfo | null = null;
