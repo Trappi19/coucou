@@ -15,6 +15,15 @@ import { clear, dot, h, svg } from "./dom";
 import { ICONS } from "./icons";
 import type { ViewHost } from "./views";
 
+/**
+ * Paused this long, the music leaves the small island as if the player were
+ * closed: Spotify left open in the background isn't music playing. It comes
+ * back the moment it plays again; the music tab keeps it meanwhile.
+ */
+const IDLE_HIDE_MS = 60_000;
+
+let idleTimer: number | null = null;
+
 /** A new report from Rust; the cover only comes with a new track, so it is kept. */
 export function setMedia(raw: MediaInfo | null): void {
   if (!raw || !raw.title) {
@@ -23,11 +32,24 @@ export function setMedia(raw: MediaInfo | null): void {
     const prev = State.media;
     State.media = { ...raw, cover: raw.cover ?? (sameTrack(prev, raw) ? prev?.cover ?? null : null) };
   }
+  // Paused: look again once the minute is up (Rust says nothing while nothing changes).
+  if (idleTimer != null) window.clearTimeout(idleTimer);
+  idleTimer = null;
+  if (State.media && !State.media.playing) {
+    idleTimer = window.setTimeout(() => {
+      idleTimer = null;
+      State.notify();
+    }, IDLE_HIDE_MS + 250);
+  }
   State.notify();
 }
 
-/** The music is shown: the widget is on and something is playing or paused. */
-export const musicShown = (): boolean => State.settings.musicWidget && State.media != null;
+/** Paused for over a minute (`at` is when the player last reported, i.e. the pause). */
+const idle = (m: MediaInfo, now = Date.now()): boolean => !m.playing && now - m.at >= IDLE_HIDE_MS;
+
+/** The music is in the small island: the widget is on, and it plays or was just paused. */
+export const musicShown = (): boolean =>
+  State.settings.musicWidget && State.media != null && !idle(State.media);
 
 /** Four bars dancing while it plays, resting low when paused. Pure CSS. */
 export function musicWave(): HTMLElement {
@@ -40,8 +62,22 @@ export interface MusicCompact {
   el: HTMLElement;
   progress: HTMLElement;
   sync(): void;
-  /** The time and the progress line, once a second while it plays. */
-  tick(): void;
+}
+
+/**
+ * The time and the progress line need their own clock: the island's frame loop
+ * is paused by WebView2 while nobody touches the window, so the music would
+ * freeze until the mouse moved. A timer twice a second, only while it plays.
+ */
+function playClock(tick: () => void): (on: boolean) => void {
+  let timer: number | null = null;
+  return (on) => {
+    if (on && timer == null) timer = window.setInterval(tick, 500);
+    if (!on && timer != null) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+  };
 }
 
 export function buildMusicCompact(): MusicCompact {
@@ -61,16 +97,17 @@ export function buildMusicCompact(): MusicCompact {
     time.textContent = m.durationMs > 0 ? formatTime(pos) : "";
     fill.style.width = m.durationMs > 0 ? `${(pos / m.durationMs) * 100}%` : "0%";
   }
+  const clock = playClock(tick);
 
   return {
     el,
     progress,
-    tick,
     sync() {
       const m = State.media;
       const on = musicShown() && State.mode === "compact";
       el.classList.toggle("on", on);
       progress.classList.toggle("on", on && (m?.durationMs ?? 0) > 0);
+      clock(on && m?.playing === true);
       if (!m) return;
       const next = `${m.appId}|${m.title}|${m.artist}|${m.playing}`;
       if (next !== key) {
@@ -165,13 +202,23 @@ export function buildMusic(): ViewHost {
     total.textContent = m.durationMs > 0 ? formatTime(m.durationMs) : "";
     fill.style.width = m.durationMs > 0 ? `${(pos / m.durationMs) * 100}%` : "0%";
   }
+  const clock = playClock(tick);
+  let shown = false;
 
   return {
     el,
-    tick,
+    show() {
+      shown = true;
+      clock(State.media?.playing === true);
+    },
+    hide() {
+      shown = false;
+      clock(false);
+    },
     sync() {
       const m = State.media;
       el.classList.toggle("nothing", !m);
+      clock(shown && m?.playing === true);
       if (!m) return;
       // The player answered: what it says wins over the guess.
       const playing = optimistic ?? m.playing;

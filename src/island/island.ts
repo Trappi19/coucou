@@ -59,7 +59,8 @@ export class Island {
   /** What's playing, in compact (views/music.ts). */
   private musicCompact!: MusicCompact;
   private musicWasShown = false;
-  private musicTickAt = 0;
+  /** A new version was found while the island was busy: offered when it folds. */
+  private updateWaiting = false;
   private countdown!: HTMLElement;
   private wakeStrip!: HTMLElement;
 
@@ -295,6 +296,8 @@ export class Island {
           else if (from === "hidden") Sound.play("peek");
           this.setMode("compact");
           if (from === "coucou") State.view = State.defaultView();
+          // An update that came while the island was busy: now's the time.
+          if (this.updateWaiting) window.setTimeout(() => this.offerUpdate(), 1200);
           break;
         case "home":
           this.expand(this.reopenView ?? State.defaultView());
@@ -335,9 +338,17 @@ export class Island {
    * of what they are doing — then it waits in the island's settings (⚙).
    */
   offerUpdate() {
-    if (!State.update || State.paused || this.fsm.state === "coucou") return;
-    if (State.mode === "expanded" && this.engaged) return;
+    if (!State.update || State.paused || State.resizing) return;
+    // Busy (the greeting, a conversation…): it waits, and comes up the next
+    // time the island folds back to compact.
+    if (this.fsm.state === "coucou" || (State.mode === "expanded" && this.engaged)) {
+      this.updateWaiting = true;
+      return;
+    }
+    this.updateWaiting = false;
     Sound.play("finish");
+    // Pinned: it stays until Install or Later, even with nobody looking.
+    State.isPinned = true;
     this.alert("update");
   }
 
@@ -963,11 +974,6 @@ export class Island {
 
     tickMiniBots(dt);
     this.views.get(State.view)?.tick?.(nowMs);
-    // The compact time and progress line move on twice a second, no more.
-    if (State.mode === "compact" && State.media?.playing && nowMs - this.musicTickAt > 500) {
-      this.musicTickAt = nowMs;
-      this.musicCompact.tick();
-    }
     if (UploadSeq.isActive) this.stepSequence();
     this.updateCountdown(nowMs);
 

@@ -95,7 +95,9 @@ async function main() {
         // Tray → Check for updates: the card says either way.
         void Bridge.updateStatus().then((s) => {
           State.update = s?.available ? { version: s.available.version, builtAt: s.available.builtAt } : null;
-          island.alert("update");
+          // A new version stays up until answered; "up to date" folds by itself.
+          if (State.update) island.offerUpdate();
+          else island.alert("update");
         });
         break;
       case "resize":

@@ -130,7 +130,8 @@ pub fn start(app: AppHandle) {
             if stamp != seen {
                 seen = stamp;
                 let found = check();
-                if found.is_some() && found != announced {
+                if let Some(update) = found.as_ref().filter(|_| found != announced) {
+                    crate::log::line(format!("update: {} found in the updates folder", update.version));
                     let _ = app.emit("update-available", found.clone());
                 }
                 announced = found;
