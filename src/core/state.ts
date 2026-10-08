@@ -2,6 +2,7 @@
 
 import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
 import type { EyeShape } from "../mochi/engine";
+import type { MediaInfo } from "./media";
 import type { PlanUsage } from "./plan";
 
 export type AgentSource = "claudeCode" | "n8n" | "agent";
@@ -130,6 +131,8 @@ export interface Settings {
   shortcuts: Record<string, { keys: string; enabled: boolean }>;
   /** How often the Claude plan usage is fetched in the background, in minutes. 0 = never. */
   planRefreshMinutes: number;
+  /** What's playing shows in the small island (and the music tab is there). */
+  musicWidget: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -154,6 +157,7 @@ export const DEFAULT_SETTINGS: Settings = {
   expandedScale: 1,
   shortcuts: {},
   planRefreshMinutes: 5,
+  musicWidget: true,
 };
 
 type Listener = () => void;
@@ -200,6 +204,9 @@ class AppState {
 
   /** A newer local build ready to install, if any. */
   update: { version: string; builtAt: string | null } | null = null;
+
+  /** What's playing (Spotify, a browser…), null when nothing. */
+  media: MediaInfo | null = null;
 
   /** Claude plan usage (5 hours / week), from Claude Code's own reports. */
   planUsage: PlanUsage | null = null;

@@ -9,6 +9,7 @@ mod integrations;
 mod island;
 mod local_chat;
 mod log;
+mod media;
 mod notes;
 mod pipe;
 mod platform;
@@ -407,6 +408,12 @@ fn secret_clear(app: AppHandle, key: String) -> Result<(), String> {
     Ok(())
 }
 
+/// The music tab: play/pause, next, previous, seek — on whatever is playing.
+#[tauri::command]
+async fn media_control(action: String, position_ms: Option<u64>) -> Result<(), String> {
+    media::control(action, position_ms).await
+}
+
 /// Settings → Shortcuts: each action, its keys and whether Windows took them.
 #[tauri::command]
 fn shortcuts_status(app: AppHandle) -> Vec<shortcuts::ActionStatus> {
@@ -599,6 +606,7 @@ pub fn run() {
             refresh_integration,
             github_refresh,
             shortcuts_status,
+            media_control,
             open_n8n,
             open_settings_window,
             set_paused,
@@ -632,6 +640,7 @@ pub fn run() {
             integrations::start(handle.clone());
             updates::start(handle.clone());
             shortcuts::apply(&handle, &loaded.shortcuts);
+            media::start(handle.clone());
             Ok(())
         })
         .run(tauri::generate_context!())

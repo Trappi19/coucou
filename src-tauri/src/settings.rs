@@ -50,6 +50,13 @@ pub struct Settings {
     /// How often the Claude plan usage is fetched in the background, in minutes. 0 = never.
     #[serde(default = "default_plan_refresh")]
     pub plan_refresh_minutes: u32,
+    /// What's playing shows in the small island, with a music tab.
+    #[serde(default = "default_true")]
+    pub music_widget: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_plan_refresh() -> u32 {
@@ -99,6 +106,7 @@ impl Default for Settings {
             expanded_scale: default_scale(),
             shortcuts: Default::default(),
             plan_refresh_minutes: default_plan_refresh(),
+            music_widget: true,
         }
     }
 }

@@ -122,6 +122,9 @@ export const Bridge = {
 
   // ── Integrations ──────────────────────────────────────────────────────────
   refreshIntegration: (id: string) => call<void>("refresh_integration", { id }),
+  /** The music tab: play/pause ("toggle"), "next", "previous", or "seek" to positionMs. */
+  mediaControl: (action: "toggle" | "next" | "previous" | "seek", positionMs?: number) =>
+    callOrThrow<void>("media_control", { action, positionMs: positionMs ?? null }),
   /** Each global shortcut, its keys and whether Windows accepted them. */
   shortcutsStatus: () => call<ShortcutStatus[]>("shortcuts_status"),
   /** The GitHub card came up: fetch that section again if it is stale. */

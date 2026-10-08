@@ -4,7 +4,9 @@
 
 use std::path::PathBuf;
 
+mod media;
 mod windows;
+pub use self::media::*;
 pub use self::windows::*;
 
 /// Wall-clock time in the user's time zone, for log lines and backup names.

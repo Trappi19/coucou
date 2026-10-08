@@ -12,6 +12,7 @@ import { buildPrompt } from "./chat";
 import { buildNotes } from "./notes";
 import { buildSessions } from "./sessions";
 import { buildPlanPill, buildUsage } from "./usage";
+import { buildMusic } from "./music";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
 import { renderIntegrationCard, type CardEntrance, type IntegrationCardHooks } from "./integrations";
 
@@ -100,6 +101,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
   const tabDrop = h("button", { class: "tab", title: "Drop", onclick: () => go("upload") }, svg(ICONS.plus, 13));
   const tabHistory = h("button", { class: "tab", title: "Conversations", onclick: () => go("sessions") }, svg(ICONS.clock, 13));
   const tabNotes = h("button", { class: "tab", title: "Notes", onclick: () => go("notes") }, svg(ICONS.note, 13, { stroke: 2.1 }));
+  const tabMusic = h("button", { class: "tab", title: "Music", onclick: () => go("music") }, svg(ICONS.music, 13, { stroke: 2 }));
 
   const gearBtn = h("button", { title: "Settings", onclick: () => go("settings") }, svg(ICONS.gear, 14));
   const soundBtn = h("button", { title: "Mute", onclick: () => actions.toggleSound() }, svg(ICONS.speakerOn, 14));
@@ -122,7 +124,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
   const el = h(
     "div",
     { id: "header" },
-    h("div", { class: "tabs" }, tabHome, tabChat, tabHistory, tabNotes, tabDrop),
+    h("div", { class: "tabs" }, tabHome, tabChat, tabHistory, tabNotes, tabMusic, tabDrop),
     h("div", { class: "header-actions" }, planPill.el, gearBtn, soundBtn, foldBtn),
   );
 
@@ -136,6 +138,10 @@ export function buildHeader(actions: ViewActions): ViewHost {
       tabHistory.classList.toggle("on", v === "sessions");
       tabHistory.style.display = State.usesClaudeCode ? "" : "none";
       tabNotes.classList.toggle("on", v === "notes");
+      tabMusic.classList.toggle("on", v === "music");
+      tabMusic.style.display = State.settings.musicWidget ? "" : "none";
+      // A little dot on the tab while something plays.
+      tabMusic.classList.toggle("live", State.media?.playing === true);
       tabDrop.classList.toggle("on", v === "upload");
       gearBtn.classList.toggle("on", v === "settings");
       clear(gearBtn);
@@ -633,6 +639,7 @@ export function buildViews(
   map.set("resize", buildResize());
   map.set("update", buildUpdate(actions));
   map.set("usage", buildUsage());
+  map.set("music", buildMusic());
   map.set("prompt", buildPrompt(actions, onChatHeightChange));
   map.set("sessions", buildSessions(actions));
   map.set("notes", buildNotes(actions));

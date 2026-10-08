@@ -10,6 +10,8 @@ import { registerIntegrationHandlers, refreshConfigured } from "./island/integra
 import { registerShortcutHandlers } from "./island/shortcuts";
 import { streamReply } from "./views/chat";
 import { restorePlanUsage, setPlanUsage, startPlanAutoRefresh } from "./views/usage";
+import { setMedia } from "./views/music";
+import type { MediaInfo } from "./core/media";
 
 /** Whether whoever answers the chat is set up, for the badge in the island's settings. */
 async function refreshChatReady() {
@@ -59,6 +61,9 @@ async function main() {
   restorePlanUsage();
   await onEvent<unknown>("plan-usage", (usage) => setPlanUsage(usage));
   startPlanAutoRefresh();
+
+  // What's playing (Spotify, a browser…), for the music widget.
+  await onEvent<MediaInfo | null>("media", (info) => setMedia(info));
 
   void refreshChatReady();
 

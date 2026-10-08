@@ -4,7 +4,7 @@
 import { Tracked, Spring, clamp } from "../core/anim";
 import { Bridge, IS_TAURI, onDragDrop } from "../core/bridge";
 import {
-  EXPANDED_CORNER, EXPANDED_W, NOTCH_W, PANEL_H, PANEL_W,
+  COMPACT_MUSIC_W, EXPANDED_CORNER, EXPANDED_W, NOTCH_W, PANEL_H, PANEL_W,
   ROUNDED_CORNER, VIEW_LAYOUTS, botGlowColor, botGlowOpacity, botPosition, chatPromptHeight,
   islandSize,
   type IslandMode, type IslandViewName,
@@ -20,6 +20,7 @@ import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
 import { dot, h } from "../views/dom";
+import { buildMusicCompact, musicShown, type MusicCompact } from "../views/music";
 import { IslandStateMachine } from "./fsm";
 import { ResizeController, type ResizeTarget } from "./resize";
 
@@ -55,6 +56,10 @@ export class Island {
   private miniGrid!: HTMLElement;
   /** The plan percentage shown in compact. */
   private planCompact!: HTMLElement;
+  /** What's playing, in compact (views/music.ts). */
+  private musicCompact!: MusicCompact;
+  private musicWasShown = false;
+  private musicTickAt = 0;
   private countdown!: HTMLElement;
   private wakeStrip!: HTMLElement;
 
@@ -211,6 +216,7 @@ export class Island {
     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
     this.miniGrid = h("div", { id: "mini-grid" });
     this.planCompact = h("div", { id: "plan-compact" });
+    this.musicCompact = buildMusicCompact();
     this.countdown = h("div", { id: "countdown" });
 
     this.header = buildHeader(actions);
@@ -260,6 +266,8 @@ export class Island {
       this.botCanvas,
       this.miniGrid,
       this.planCompact,
+      this.musicCompact.el,
+      this.musicCompact.progress,
       this.countdown,
       ...this.resize.handles,
     );
@@ -658,9 +666,11 @@ export class Island {
   // ── Geometry ────────────────────────────────────────────────────────────────
 
   private targetSize(): { w: number; h: number; r: number } {
-    const { w, h } = islandSize(State.mode, State.view, State.chatHistory.length);
+    const size = islandSize(State.mode, State.view, State.chatHistory.length);
+    // Music playing: compact widens (with the usual spring) to make room for it.
+    const w = State.mode === "compact" && musicShown() ? COMPACT_MUSIC_W : size.w;
     const r = State.mode === "expanded" ? EXPANDED_CORNER : ROUNDED_CORNER;
-    return { w, h, r };
+    return { w, h: size.h, r };
   }
 
   private animateGeometry(shrinking: boolean) {
@@ -953,6 +963,11 @@ export class Island {
 
     tickMiniBots(dt);
     this.views.get(State.view)?.tick?.(nowMs);
+    // The compact time and progress line move on twice a second, no more.
+    if (State.mode === "compact" && State.media?.playing && nowMs - this.musicTickAt > 500) {
+      this.musicTickAt = nowMs;
+      this.musicCompact.tick();
+    }
     if (UploadSeq.isActive) this.stepSequence();
     this.updateCountdown(nowMs);
 
@@ -1126,6 +1141,14 @@ export class Island {
     const pct = dominantPct(State.planUsage);
     const showPlan = State.mode === "compact" && State.usesClaudeCode && pct != null;
     this.planCompact.style.opacity = showPlan ? "1" : "0";
+    // Music in the middle: the plan slides over to the right, and back when it stops.
+    const music = musicShown();
+    this.planCompact.classList.toggle("aside", music);
+    this.musicCompact.sync();
+    if (music !== this.musicWasShown) {
+      this.musicWasShown = music;
+      if (State.mode === "compact") this.animateGeometry(!music);
+    }
     if (showPlan) {
       const label = `${Math.round(pct)}%`;
       if (this.planCompact.dataset.label !== label) {

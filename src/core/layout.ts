@@ -26,6 +26,7 @@ export type IslandViewName =
   | "resize"
   | "update"
   | "usage"
+  | "music"
   | "greeting";
 
 export type BotStateName =
@@ -62,6 +63,8 @@ export const PANEL_H = 320;
 export const NOTCH_W = 184;
 export const NOTCH_H = 32;
 export const COMPACT_W = 288; // NOTCH_W + 104
+/** Compact with music playing: room for the wave, the title and the time. */
+export const COMPACT_MUSIC_W = 400;
 export const EXPANDED_W = 640;
 
 export const ROUNDED_CORNER = 14; // hidden / compact
@@ -101,6 +104,8 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   update: { height: 160, botX: 62, botY: null, botDiameter: 58, agentMode: "column" },
   // Claude plan usage: the 5-hour and weekly gauges.
   usage: { height: 160, botX: 62, botY: null, botDiameter: 56, agentMode: "none" },
+  // What's playing: cover, title, progress, controls.
+  music: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
   greeting: { height: 150, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
 };
 

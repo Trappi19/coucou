@@ -26,6 +26,11 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
 windows = { version = "0.61", features = [
+  # What's playing (Spotify, a browser…): the system media session, WinRT.
+  "Foundation",
+  "Media_Control",
+  "Storage_Streams",
+  "Win32_System_WinRT",
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Security_Authorization",
