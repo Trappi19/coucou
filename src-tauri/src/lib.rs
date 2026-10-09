@@ -15,6 +15,7 @@ mod pipe;
 mod platform;
 mod secrets;
 mod settings;
+mod alarms;
 mod shortcuts;
 mod tray;
 mod updates;
@@ -474,7 +475,7 @@ fn open_updates_folder() {
 
 #[tauri::command]
 async fn notes_load() -> Result<Option<String>, String> {
-    tauri::async_runtime::spawn_blocking(notes::load)
+    tauri::async_runtime::spawn_blocking(|| notes::load(notes::Doc::Notes))
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
@@ -482,10 +483,33 @@ async fn notes_load() -> Result<Option<String>, String> {
 
 #[tauri::command]
 async fn notes_save(json: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || notes::save(&json))
+    tauri::async_runtime::spawn_blocking(move || notes::save(notes::Doc::Notes, &json))
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn reminders_load() -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(|| notes::load(notes::Doc::Reminders))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn reminders_save(json: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || notes::save(notes::Doc::Reminders, &json))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+/// An alarm for the timer or a reminder: "alarm-due" with `id` at `at_ms`
+/// (ms since the epoch), or called off (None).
+#[tauri::command]
+fn alarm_set(app: AppHandle, id: String, at_ms: Option<u64>) {
+    alarms::set(&app, id, at_ms);
 }
 
 /// Lets the island write to the same log as the Rust side.
@@ -603,8 +627,11 @@ pub fn run() {
             approval_ack,
             approval_decline,
             log_line,
+            alarm_set,
             notes_load,
             notes_save,
+            reminders_load,
+            reminders_save,
             chat_send,
             chat_reset,
             chat_cancel,

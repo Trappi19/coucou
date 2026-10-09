@@ -84,6 +84,40 @@ class SoundEngine {
     this.enabled = on;
   }
 
+  /**
+   * The timer's bell: a "ding-dong", made here rather than taken from the WAVs
+   * so it sounds like nothing else Mochi does. Two struck notes, each with a
+   * couple of overtones dying away like a small bell.
+   */
+  chime() {
+    if (!this.enabled) return;
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    if (this.idleTimer != null) {
+      window.clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+    if (ctx.state === "suspended") void ctx.resume();
+    const t0 = ctx.currentTime + 0.02;
+    const notes = [1318.5, 1046.5]; // E6, then C6
+    notes.forEach((freq, i) => {
+      const start = t0 + i * 0.24;
+      for (const [mult, amp, decay] of [[1, 0.55, 1.4], [2.01, 0.16, 0.7], [3.02, 0.06, 0.4]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * mult;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(amp, start + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + decay);
+        osc.connect(gain).connect(master);
+        osc.start(start);
+        osc.stop(start + decay + 0.05);
+      }
+    });
+  }
+
   play(name: SoundName | string) {
     if (!this.enabled) return;
     const ctx = this.ctx;

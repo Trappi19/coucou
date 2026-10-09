@@ -27,6 +27,8 @@ export type IslandViewName =
   | "update"
   | "usage"
   | "music"
+  | "timer"
+  | "reminders"
   | "greeting";
 
 export type BotStateName =
@@ -105,6 +107,10 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   // Claude plan usage: the 5-hour and weekly gauges.
   usage: { height: 160, botX: 62, botY: null, botDiameter: 56, agentMode: "none" },
   // What's playing: cover, title, progress, controls.
+  // The timer, and its alarm: Mochi in front, where it can be seen ringing.
+  timer: { height: 160, botX: 64, botY: null, botDiameter: 56, agentMode: "none" },
+  // Reminders: the form and the list. Mochi keeps the chat's column.
+  reminders: { height: 260, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
   music: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
   greeting: { height: 150, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
 };

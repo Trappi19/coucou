@@ -3317,3 +3317,595 @@ input[type="range"]::-webkit-slider-thumb {
 .nothing .mu-empty {
   display: flex;
 }
+
+/* ── Timer ──────────────────────────────────────────────────────────────── */
+
+.tm-body {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 18px 0 120px;
+}
+
+.tm-left {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tm-heading {
+  font: 600 10.5px var(--font);
+  color: var(--dim-3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tm-heading.alarm {
+  color: var(--amber);
+}
+
+.tm-time {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 600 34px/1.1 var(--font);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  outline: none;
+  padding: 0;
+  cursor: text;
+  transition: color 0.2s;
+}
+
+.tm-time:read-only {
+  cursor: default;
+}
+
+.tm-time.paused {
+  color: var(--dim);
+}
+
+/* A length that couldn't be read. */
+.tm-time.bad {
+  animation: tm-nope 0.4s ease-in-out;
+  color: var(--red-text);
+}
+
+@keyframes tm-nope {
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.tm-card.ringing .tm-time {
+  color: #ffd38a;
+  animation: tm-pulse 1s ease-in-out infinite;
+}
+
+@keyframes tm-pulse {
+  50% { opacity: 0.45; }
+}
+
+.tm-label {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #c5c8cd;
+  font: 400 12px var(--font);
+  outline: none;
+  padding: 0;
+  cursor: text;
+}
+
+.tm-label::placeholder {
+  color: var(--dim-4);
+}
+
+.tm-right {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.tm-presets {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transition: opacity 0.2s;
+}
+
+.tm-presets.off {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.tm-preset {
+  min-width: 26px;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c5c8cd;
+  font: 500 11px var(--font);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  transition: background 0.12s, color 0.12s;
+}
+
+.tm-preset:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+}
+
+.tm-preset.on {
+  background: rgba(245, 165, 36, 0.22);
+  color: #ffd38a;
+}
+
+.tm-unit {
+  margin-left: 3px;
+  font: 400 10.5px var(--font);
+  color: var(--dim-4);
+}
+
+.tm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn.tm-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  gap: 6px;
+}
+
+/* How far along, along the card's bottom edge. */
+.tm-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: opacity 0.3s;
+}
+
+.tm-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, rgba(245, 165, 36, 0.4), #f5a524);
+  transition: width 1s linear;
+}
+
+/* The countdown in the open island's header, from any other view. */
+.header-actions .header-timer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  margin-right: -4px;
+  border: 1px solid rgba(245, 165, 36, 0.25);
+  border-radius: 999px;
+  background: rgba(245, 165, 36, 0.08);
+  color: #f7c46c;
+  font: 600 10.5px var(--font);
+  font-variant-numeric: tabular-nums;
+}
+
+.header-actions .header-timer.paused {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: var(--dim-2);
+}
+
+.header-actions .header-timer.ringing {
+  animation: tm-pulse 1s ease-in-out infinite;
+}
+
+/* …and in the small island. */
+.sc-timer {
+  color: #f7c46c;
+}
+
+.sc-timer.paused {
+  color: var(--dim-2);
+}
+
+.sc-timer.ringing {
+  animation: tm-pulse 1s ease-in-out infinite;
+}
+
+/* "Timer · Reminders", top right of both cards. */
+.time-switch {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 12px;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.time-switch button {
+  height: 20px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dim-3);
+  font: 500 10.5px var(--font);
+  cursor: default;
+  transition: background 0.12s, color 0.12s;
+}
+
+.time-switch button:hover {
+  color: var(--ink);
+}
+
+.time-switch button.on {
+  background: var(--tab-on);
+  color: var(--ink);
+}
+
+/* The timer's own controls sit lower, clear of the switch. */
+.tm-right {
+  padding-top: 22px;
+}
+
+/* ── Reminders ──────────────────────────────────────────────────────────── */
+
+.rm-body {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 10px 84px;
+}
+
+.rm-top {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.rm-title {
+  font: 600 10.5px var(--font);
+  color: var(--dim-3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rm-card .time-switch {
+  top: 10px;
+}
+
+.rm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rm-fields {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rm-what,
+.rm-when {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  font: 400 12px var(--font);
+  outline: none;
+  cursor: text;
+  transition: border-color 0.15s;
+}
+
+.rm-what {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rm-when {
+  flex: 0 0 150px;
+  width: 150px;
+}
+
+.rm-what:focus,
+.rm-when:focus {
+  border-color: rgba(245, 165, 36, 0.45);
+}
+
+.rm-what::placeholder,
+.rm-when::placeholder {
+  color: var(--dim-4);
+}
+
+.rm-when.bad {
+  animation: tm-nope 0.4s ease-in-out;
+  border-color: rgba(244, 80, 94, 0.6);
+}
+
+.btn.rm-add {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12px;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.rm-hints {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.rm-quick {
+  display: flex;
+  gap: 4px;
+}
+
+.rm-chip {
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--dim-2);
+  font: 500 10.5px var(--font);
+  cursor: default;
+  transition: background 0.12s, color 0.12s;
+}
+
+.rm-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+}
+
+.rm-preview {
+  margin-left: auto;
+  font: 500 10.5px var(--font);
+  color: #f7c46c;
+  white-space: nowrap;
+}
+
+.rm-preview.bad {
+  color: var(--red-text);
+}
+
+.rm-list {
+  /* A row leaving is lifted out of the flow, positioned in here. */
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.rm-row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  padding: 3px 6px 3px 8px;
+  border-radius: 8px;
+  transition: background 0.12s;
+}
+
+.rm-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rm-at {
+  flex: 0 0 auto;
+  min-width: 44px;
+  font: 600 11.5px var(--font);
+  color: #f7c46c;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rm-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 400 12px var(--font);
+  color: #d4d7dc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rm-in {
+  flex: 0 0 auto;
+  font: 400 10.5px var(--font);
+  color: var(--dim-4);
+  white-space: nowrap;
+}
+
+/* Edit and delete: small round buttons, shown on hover. */
+.rm-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dim-3);
+  cursor: default;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+
+.rm-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+}
+
+.rm-icon.del:hover {
+  background: rgba(244, 80, 94, 0.2);
+  color: var(--red-text);
+}
+
+.rm-icon.save {
+  background: rgba(34, 197, 94, 0.16);
+  color: #6ee7a0;
+}
+
+.rm-icon.save:hover {
+  background: rgba(34, 197, 94, 0.3);
+  color: #b4f5cd;
+}
+
+.rm-hover {
+  opacity: 0;
+}
+
+.rm-row:hover .rm-hover {
+  opacity: 1;
+}
+
+/* The text is the way into editing. */
+.rm-text-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: text;
+}
+
+/* Editing in place: the row turns into two fields. */
+.rm-row.editing {
+  gap: 6px;
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(245, 165, 36, 0.35);
+}
+
+.rm-edit-what,
+.rm-edit-when {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--ink);
+  font: 400 12px var(--font);
+  outline: none;
+  cursor: text;
+}
+
+.rm-edit-what {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rm-edit-when {
+  flex: 0 0 118px;
+  width: 118px;
+  color: #f7c46c;
+  font-weight: 600;
+}
+
+.rm-edit-what.bad,
+.rm-edit-when.bad {
+  animation: tm-nope 0.4s ease-in-out;
+  box-shadow: inset 0 0 0 1px rgba(244, 80, 94, 0.6);
+}
+
+.rm-in.bad {
+  color: var(--red-text);
+}
+
+/* Just added, edited or snoozed: a warm glow that fades. */
+.rm-row.flash {
+  animation: rm-flash 1.1s ease-out;
+}
+
+@keyframes rm-flash {
+  0% { background: rgba(245, 165, 36, 0.32); }
+  100% { background: rgba(245, 165, 36, 0); }
+}
+
+/* Due now: amber, at the top, with Snooze and Done. */
+.rm-row.ringing {
+  background: rgba(245, 165, 36, 0.14);
+  border: 1px solid rgba(245, 165, 36, 0.3);
+}
+
+.rm-row.ringing .rm-text {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.rm-bell {
+  display: grid;
+  place-items: center;
+  color: var(--amber);
+  animation: rm-shake 1s ease-in-out infinite;
+}
+
+@keyframes rm-shake {
+  0%, 60%, 100% { transform: rotate(0); }
+  10%, 30%, 50% { transform: rotate(-14deg); }
+  20%, 40% { transform: rotate(14deg); }
+}
+
+.btn.rm-act {
+  font-size: 11px;
+  padding: 4px 10px;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.rm-empty {
+  font: 400 11.5px var(--font);
+  color: var(--dim-3);
+  padding: 6px 8px;
+}
+
+.rm-empty.err {
+  color: var(--red-text);
+}
+
+/* The card's glow fades from one colour to the next (the alarm going quiet)
+   instead of switching: --wash is declared a colour so it can be animated. */
+@property --wash {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0);
+}
+
+.tm-card,
+.rm-card {
+  transition: --wash 0.7s ease;
+}
+
+/* The digits swell from their left edge, where they start. */
+.tm-time {
+  transform-origin: left center;
+}

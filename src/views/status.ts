@@ -6,7 +6,9 @@
 import { Bridge } from "../core/bridge";
 import { dominantPct, planColor } from "../core/plan";
 import { State } from "../core/state";
-import { dot, h } from "./dom";
+import { Timer, formatTimer } from "../core/timer";
+import { dot, h, svg } from "./dom";
+import { ICONS } from "./icons";
 
 /** How often the battery is asked about. It moves slowly. */
 const BATTERY_EVERY_MS = 60_000;
@@ -63,10 +65,12 @@ export interface StatusCluster {
 
 /** For the small island: "● 62%  ▮ 84%  14:32". */
 export function buildStatusCluster(): StatusCluster {
+  const timerText = h("span");
+  const timer = h("span", { class: "sc-item sc-timer" }, svg(ICONS.timer, 10), timerText);
   const plan = h("span", { class: "sc-item sc-plan" });
   const battery = h("span", { class: "sc-item sc-battery" });
   const clock = h("span", { class: "sc-item sc-clock" });
-  const el = h("div", { id: "plan-compact" }, plan, battery, clock);
+  const el = h("div", { id: "plan-compact" }, timer, plan, battery, clock);
   let planKey = "";
   let batteryKey = "";
 
@@ -74,6 +78,13 @@ export function buildStatusCluster(): StatusCluster {
     el,
     sync(withPlan) {
       const extras = State.settings.clockBattery;
+
+      // A timer, running, paused or ringing, comes first.
+      timer.style.display = Timer.active ? "" : "none";
+      if (Timer.active) {
+        timerText.textContent = formatTimer(Timer.remaining());
+        timer.className = `sc-item sc-timer ${Timer.phase}`;
+      }
 
       const pct = withPlan ? dominantPct(State.planUsage) : null;
       plan.style.display = pct != null ? "" : "none";
@@ -101,7 +112,7 @@ export function buildStatusCluster(): StatusCluster {
       clock.style.display = extras ? "" : "none";
       if (extras) clock.textContent = clockText();
 
-      return pct != null || b != null || extras;
+      return Timer.active || pct != null || b != null || extras;
     },
   };
 }

@@ -13,6 +13,9 @@ import { buildNotes } from "./notes";
 import { buildSessions } from "./sessions";
 import { buildPlanPill, buildUsage } from "./usage";
 import { buildMusic } from "./music";
+import { buildTimer } from "./timer";
+import { buildReminders } from "./reminders";
+import { Timer, formatTimer } from "../core/timer";
 import { buildHeaderStatus } from "./status";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
 import { renderIntegrationCard, type CardEntrance, type IntegrationCardHooks } from "./integrations";
@@ -37,7 +40,15 @@ export interface ViewActions {
   installUpdate(): void;
   openSettingsWindow(): void;
   blip(): void;
+  /** Mochi reacts to something done from the island, with its sound. */
+  react(kind: Reaction): void;
 }
+
+/**
+ * start: a timer starts · add: a reminder is added · done: an alarm answered,
+ * a reminder done · snooze: put off for later · save: an edit kept.
+ */
+export type Reaction = "start" | "add" | "done" | "snooze" | "save";
 
 export interface ViewHost {
   el: HTMLElement;
@@ -103,6 +114,17 @@ export function buildHeader(actions: ViewActions): ViewHost {
   const tabHistory = h("button", { class: "tab", title: "Conversations", onclick: () => go("sessions") }, svg(ICONS.clock, 13));
   const tabNotes = h("button", { class: "tab", title: "Notes", onclick: () => go("notes") }, svg(ICONS.note, 13, { stroke: 2.1 }));
   const tabMusic = h("button", { class: "tab", title: "Music", onclick: () => go("music") }, svg(ICONS.music, 13, { stroke: 2 }));
+  // One tab for the timer and the reminders, back to whichever was used last.
+  let timeView: IslandViewName = "timer";
+  const tabTimer = h("button", { class: "tab", title: "Timer & reminders", onclick: () => go(timeView) }, svg(ICONS.timer, 13));
+  // The countdown, in sight from every other view; a click goes to the timer.
+  const timerText = h("span");
+  const timerPill = h(
+    "button",
+    { class: "header-timer", title: "Timer", onclick: () => go("timer") },
+    svg(ICONS.timer, 11),
+    timerText,
+  );
 
   const gearBtn = h("button", { title: "Settings", onclick: () => go("settings") }, svg(ICONS.gear, 14));
   const soundBtn = h("button", { title: "Mute", onclick: () => actions.toggleSound() }, svg(ICONS.speakerOn, 14));
@@ -127,8 +149,8 @@ export function buildHeader(actions: ViewActions): ViewHost {
   const el = h(
     "div",
     { id: "header" },
-    h("div", { class: "tabs" }, tabHome, tabChat, tabHistory, tabNotes, tabMusic, tabDrop),
-    h("div", { class: "header-actions" }, headerStatus.el, planPill.el, gearBtn, soundBtn, foldBtn),
+    h("div", { class: "tabs" }, tabHome, tabChat, tabHistory, tabNotes, tabTimer, tabMusic, tabDrop),
+    h("div", { class: "header-actions" }, timerPill, headerStatus.el, planPill.el, gearBtn, soundBtn, foldBtn),
   );
 
   return {
@@ -142,6 +164,15 @@ export function buildHeader(actions: ViewActions): ViewHost {
       tabHistory.classList.toggle("on", v === "sessions");
       tabHistory.style.display = State.usesClaudeCode ? "" : "none";
       tabNotes.classList.toggle("on", v === "notes");
+      if (v === "timer" || v === "reminders") timeView = v;
+      tabTimer.classList.toggle("on", v === "timer" || v === "reminders");
+      tabTimer.classList.toggle("live", Timer.phase === "running" || Timer.phase === "ringing");
+      const showTimer = Timer.active && v !== "timer" && !State.resizing;
+      timerPill.style.display = showTimer ? "" : "none";
+      if (showTimer) {
+        timerText.textContent = formatTimer(Timer.remaining());
+        timerPill.className = `header-timer ${Timer.phase}`;
+      }
       tabMusic.classList.toggle("on", v === "music");
       tabMusic.style.display = State.settings.musicWidget ? "" : "none";
       // A little dot on the tab while something plays.
@@ -647,6 +678,8 @@ export function buildViews(
   map.set("prompt", buildPrompt(actions, onChatHeightChange));
   map.set("sessions", buildSessions(actions));
   map.set("notes", buildNotes(actions));
+  map.set("timer", buildTimer(actions));
+  map.set("reminders", buildReminders(actions));
   map.set("upload", buildUpload());
   map.set("uploading", buildUploading());
   map.set("choose", buildChoose(actions));

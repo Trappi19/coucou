@@ -114,6 +114,11 @@ export const Bridge = {
   secretSet: (key: string, value: string) => callOrThrow<void>("secret_set", { key, value }),
   secretClear: (key: string) => callOrThrow<void>("secret_clear", { key }),
 
+  /** An alarm kept by Rust: "alarm-due" with `id` at `atMs` (epoch ms), or none (null). */
+  alarmSet: (id: string, atMs: number | null) => call<void>("alarm_set", { id, atMs }),
+  remindersLoad: () => callOrThrow<string | null>("reminders_load"),
+  remindersSave: (json: string) => callOrThrow<void>("reminders_save", { json }),
+
   // ── Notes ─────────────────────────────────────────────────────────────────
   /** The stored notes document (JSON text), or null when there is none yet. */
   notesLoad: () => callOrThrow<string | null>("notes_load"),

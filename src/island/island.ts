@@ -17,10 +17,11 @@ import { Greeting } from "../mochi/greeting";
 import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
 import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
-import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
+import { buildHeader, buildViews, type Reaction, type ViewActions, type ViewHost } from "../views/views";
 import { h } from "../views/dom";
 import { buildMusicCompact, musicShown, type MusicCompact } from "../views/music";
 import { buildStatusCluster, type StatusCluster } from "../views/status";
+import { Timer } from "../core/timer";
 import { IslandStateMachine } from "./fsm";
 import { ResizeController, type ResizeTarget } from "./resize";
 
@@ -102,6 +103,8 @@ export class Island {
   private homeCollapseAt: number | null = null;
   /** Folded in the middle of a conversation: opening again goes straight back to it. */
   private reopenView: IslandViewName | null = null;
+  /** Waiting for the launch greeting to end (see whenGreeted). */
+  private afterGreeting: (() => void)[] = [];
 
   // Bot hover → love (IslandWindowController.botHoverIn)
   private botHovering = false;
@@ -210,6 +213,7 @@ export class Island {
       },
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
       blip: () => Sound.play("blip"),
+      react: (kind) => this.react(kind),
     };
 
     this.wakeStrip = h("div", { id: "wake-strip" });
@@ -289,6 +293,11 @@ export class Island {
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
     this.fsm.holdOpen = () => this.engaged;
     this.fsm.onTransition = (from, to) => {
+      if (from === "coucou" && this.afterGreeting.length > 0) {
+        // Once this transition has finished, so an alert can open over it.
+        const waiting = this.afterGreeting.splice(0);
+        queueMicrotask(() => waiting.forEach((fn) => fn()));
+      }
       switch (to) {
         case "hidden":
           this.setMode("hidden");
@@ -556,6 +565,50 @@ export class Island {
 
   reveal() {
     this.fsm.reveal();
+  }
+
+  /** Mochi answers what was just done: a happy hop, pride, a yawn for a snooze. */
+  react(kind: Reaction) {
+    switch (kind) {
+      case "start":
+        Sound.play("pop");
+        this.engine.squash();
+        this.engine.triggerEmote("happy", 1.2);
+        break;
+      case "add":
+        Sound.play("pop");
+        this.engine.squash();
+        this.engine.triggerEmote("happy", 1.2);
+        this.engine.emit("star", 3);
+        break;
+      case "done":
+        Sound.play("approve");
+        this.engine.triggerEmote("proud", 1.4);
+        break;
+      case "snooze":
+        Sound.play("yawn");
+        this.engine.triggerEmote("yawn", 1.6);
+        break;
+      case "save":
+        Sound.play("blip");
+        this.engine.squash();
+        this.engine.triggerEmote("happy", 0.9);
+        break;
+    }
+    this.ensureRunning();
+  }
+
+  /** Runs `fn` once the launch greeting is over — right away when it isn't on. */
+  whenGreeted(fn: () => void) {
+    if (this.fsm.state === "coucou") this.afterGreeting.push(fn);
+    else fn();
+  }
+
+  /** The timer is ringing: Mochi goes off like an alarm clock, with the bell. */
+  ringBell() {
+    this.engine.ring();
+    Sound.chime();
+    this.ensureRunning();
   }
 
   /** An alert stopped waiting for an answer: let the island auto-close again. */
@@ -1147,6 +1200,8 @@ export class Island {
 
     // Compact keeps the plan, the battery and the time in sight, between Mochi
     // and the grid ("● 28%  ▮ 84%  14:32").
+    // The countdown ticks once a second while it can be seen, never while hidden.
+    Timer.setTicking(State.mode !== "hidden");
     const shown = this.status.sync(State.usesClaudeCode);
     this.planCompact.style.opacity = State.mode === "compact" && shown ? "1" : "0";
     // Music in the middle: the cluster slides over to the right as one piece,

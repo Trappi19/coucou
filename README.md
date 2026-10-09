@@ -84,6 +84,22 @@ At the start of a line, `- ` starts a bulleted list, `1. ` a numbered one, `[] `
 a checklist and `# ` a heading. Tab nests a list item. Pasting keeps the text
 only. Notes are saved as you type.
 
+## Timer and reminders
+
+The timer tab has two halves. **Timer**: pick a length (1–45 min) or type one
+(`5`, `1:30`, `90s`, `1h30`), Enter starts it. The countdown stays in sight in
+the small island and in the header. **Reminders**: what to remember and when —
+`14:30`, `9h`, `in 20 min`, `dans 1h`, `tomorrow 9:00`, `lundi 9h`, `12/10 14:30`
+— or a quick time. A click on one edits it. They are kept in
+`%APPDATA%\Coucou\reminders.json`.
+
+When one is due the island opens on it and Mochi goes off like an alarm clock,
+with a bell, until you answer (Stop or a snooze for the timer, Snooze or Done for
+a reminder). The bell stops after a minute; the card stays up until answered.
+Alarms are kept by the app itself, so they ring on time with the island folded
+or after the PC wakes up, and one missed while Coucou was closed rings at the
+next start.
+
 ## Chat and keys
 
 **Settings… → Claude** takes your Anthropic API key. Keys live in the **Windows

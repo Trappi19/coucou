@@ -12,6 +12,9 @@ import { streamReply } from "./views/chat";
 import { restorePlanUsage, setPlanUsage, startPlanAutoRefresh } from "./views/usage";
 import { setMedia } from "./views/music";
 import { startStatusClock } from "./views/status";
+import { Timer } from "./core/timer";
+import { Alarms } from "./core/alarms";
+import { Reminders } from "./core/reminders";
 import type { MediaInfo } from "./core/media";
 
 /** Whether whoever answers the chat is set up, for the badge in the island's settings. */
@@ -67,6 +70,19 @@ async function main() {
 
   // What's playing (Spotify, a browser…), for the music widget.
   await onEvent<MediaInfo | null>("media", (info) => setMedia(info));
+
+  // The timer and the reminders: Rust says when one is due; the island opens
+  // on it and stays until it is answered (the bell itself stops after a minute).
+  Alarms.onOpen = (view) => {
+    State.isPinned = true;
+    island.alert(view);
+  };
+  Alarms.onPulse = () => island.ringBell();
+  Alarms.onAnswered = () => {
+    State.isPinned = false;
+    island.dropPin();
+  };
+  await onEvent<string>("alarm-due", (id) => Alarms.due(id));
 
   void refreshChatReady();
 
@@ -133,6 +149,13 @@ async function main() {
   registerShortcutHandlers(island);
 
   island.launch();
+
+  // A timer or a reminder that came due while Coucou was closed rings after
+  // the greeting, not under it.
+  island.whenGreeted(() => {
+    Timer.restore();
+    void Reminders.load();
+  });
 
   // One built while Coucou was closed: offer it once the greeting is over.
   const status = await Bridge.updateStatus();

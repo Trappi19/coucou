@@ -352,6 +352,24 @@ export class BotEngine {
     }, 1750);
   }
 
+  /** The timer is up: an alarm clock going off — a hop, a shake, hands waving. */
+  ring() {
+    const t = now();
+    this.eyeOverride = EMOTE_EYE.surprised;
+    this.eyeOverrideUntil = t + 1.1;
+    this.anim("oy", [[-0.24, 120, Ease.out], [0, 300, Ease.back]]);
+    this.anim("tilt", [
+      [0.2, 70, Ease.out], [-0.2, 100, Ease.inOut], [0.17, 100, Ease.inOut],
+      [-0.15, 100, Ease.inOut], [0.1, 100, Ease.inOut], [-0.06, 100, Ease.inOut], [0, 140, Ease.out],
+    ]);
+    this.anim("sy", [[0.86, 70, Ease.out], [1.08, 120, Ease.out], [1, 200, Ease.back]]);
+    this.anim("sx", [[1.12, 70, Ease.out], [0.95, 120, Ease.out], [1, 200, Ease.back]]);
+    this.waveStart = t + 0.05;
+    this.waveUntil = t + 1.1;
+    this.anim("hands", [[1, 150, Ease.out], [1, 800, Ease.lin], [0, 220, Ease.inOut]]);
+    this.emit("spark", 3);
+  }
+
   interruptGreet() {
     if (this.hands <= 0.01 && now() >= this.waveUntil) return;
     this.greetToken++;
