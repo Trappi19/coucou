@@ -13,6 +13,7 @@ import { restorePlanUsage, setPlanUsage, startPlanAutoRefresh } from "./views/us
 import { setMedia } from "./views/music";
 import { startStatusClock } from "./views/status";
 import { Timer } from "./core/timer";
+import { Stopwatch } from "./core/stopwatch";
 import { Alarms } from "./core/alarms";
 import { Reminders } from "./core/reminders";
 import type { MediaInfo } from "./core/media";
@@ -152,6 +153,7 @@ async function main() {
 
   // A timer or a reminder that came due while Coucou was closed rings after
   // the greeting, not under it.
+  Stopwatch.restore();
   island.whenGreeted(() => {
     Timer.restore();
     void Reminders.load();

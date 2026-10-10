@@ -22,7 +22,7 @@ const QUICK: [string, string][] = [
   ["Tomorrow 9:00", "tomorrow 9:00"],
 ];
 
-/** "Timer · Reminders": the two halves of the timer tab. */
+/** "Timer · Stopwatch · Reminders": the three parts of the timer tab. */
 export function timeSwitch(actions: ViewActions, current: IslandViewName): HTMLElement {
   const item = (view: IslandViewName, label: string) => {
     const b = h("button", {
@@ -35,7 +35,13 @@ export function timeSwitch(actions: ViewActions, current: IslandViewName): HTMLE
     }, label);
     return b;
   };
-  return h("div", { class: "time-switch" }, item("timer", "Timer"), item("reminders", "Reminders"));
+  return h(
+    "div",
+    { class: "time-switch" },
+    item("timer", "Timer"),
+    item("stopwatch", "Stopwatch"),
+    item("reminders", "Reminders"),
+  );
 }
 
 export function buildReminders(actions: ViewActions): ViewHost {

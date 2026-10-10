@@ -5,6 +5,7 @@ mod claude_code;
 mod files;
 mod github;
 mod hooks;
+mod images;
 mod integrations;
 mod island;
 mod local_chat;
@@ -314,6 +315,13 @@ async fn chat_delete_session(app: AppHandle, path: String, session_id: String) -
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// A picture from a chat answer, downloaded here and handed over as bytes: the
+/// island shows it from a blob: URL and never loads from the internet itself.
+#[tauri::command]
+async fn chat_image(url: String) -> Result<tauri::ipc::Response, String> {
+    images::fetch(&url).await.map(tauri::ipc::Response::new)
 }
 
 /// The Stop button: ends the turn in flight (Claude Code or a local model).
@@ -635,6 +643,7 @@ pub fn run() {
             chat_send,
             chat_reset,
             chat_cancel,
+            chat_image,
             local_models,
             chat_delete_session,
             chat_projects,

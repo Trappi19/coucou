@@ -86,9 +86,11 @@ only. Notes are saved as you type.
 
 ## Timer and reminders
 
-The timer tab has two halves. **Timer**: pick a length (1–45 min) or type one
+The timer tab has three parts. **Timer**: pick a length (1–45 min) or type one
 (`5`, `1:30`, `90s`, `1h30`), Enter starts it. The countdown stays in sight in
-the small island and in the header. **Reminders**: what to remember and when —
+the small island and in the header. **Stopwatch**: start, Lap to mark a lap
+(the fastest in green, the slowest in red), pause, reset; it keeps counting
+with the island folded and across a restart. **Reminders**: what to remember and when —
 `14:30`, `9h`, `in 20 min`, `dans 1h`, `tomorrow 9:00`, `lundi 9h`, `12/10 14:30`
 — or a quick time. A click on one edits it. They are kept in
 `%APPDATA%\Coucou\reminders.json`.
@@ -107,7 +109,10 @@ Credential Manager**, never on disk and never in the interface — the island ca
 only ask whether a key exists. Same for every integration key.
 
 No telemetry. The only network requests Coucou makes are to the services you
-configure yourself.
+configure yourself — and, when you ask Mochi for pictures ("show me storks"),
+to the image links in its answer. Those are downloaded by the app itself (https
+and real image files only, never the local network) and shown as thumbnails;
+a click shows one large, with a button to open it in the browser.
 
 ## Build it yourself
 

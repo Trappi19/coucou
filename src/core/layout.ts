@@ -29,6 +29,7 @@ export type IslandViewName =
   | "music"
   | "timer"
   | "reminders"
+  | "stopwatch"
   | "greeting";
 
 export type BotStateName =
@@ -109,6 +110,8 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   // What's playing: cover, title, progress, controls.
   // The timer, and its alarm: Mochi in front, where it can be seen ringing.
   timer: { height: 160, botX: 64, botY: null, botDiameter: 56, agentMode: "none" },
+  // The stopwatch grows with its laps (see viewHeights); Mochi stays by the digits.
+  stopwatch: { height: 160, botX: 64, botY: 101, botDiameter: 56, agentMode: "none" },
   // Reminders: the form and the list. Mochi keeps the chat's column.
   reminders: { height: 260, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
   music: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
@@ -124,6 +127,12 @@ export function chatPromptHeight(messageCount: number): number {
   return Math.min(300, 240 + messageCount * 40);
 }
 
+/**
+ * Views whose height follows their content, like the chat with its messages:
+ * the view registers how tall it wants to be (the stopwatch with its laps).
+ */
+export const viewHeights: Partial<Record<IslandViewName, () => number>> = {};
+
 export function islandSize(
   mode: IslandMode,
   view: IslandViewName,
@@ -137,7 +146,9 @@ export function islandSize(
     case "compact":
       return { w: COMPACT_W, h: NOTCH_H };
     case "expanded": {
-      const h = view === "prompt" ? chatPromptHeight(chatCount) : VIEW_LAYOUTS[view].height;
+      const h = view === "prompt"
+        ? chatPromptHeight(chatCount)
+        : viewHeights[view]?.() ?? VIEW_LAYOUTS[view].height;
       return { w: EXPANDED_W, h };
     }
   }

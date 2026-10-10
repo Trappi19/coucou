@@ -22,6 +22,7 @@ import { h } from "../views/dom";
 import { buildMusicCompact, musicShown, type MusicCompact } from "../views/music";
 import { buildStatusCluster, type StatusCluster } from "../views/status";
 import { Timer } from "../core/timer";
+import { Stopwatch } from "../core/stopwatch";
 import { IslandStateMachine } from "./fsm";
 import { ResizeController, type ResizeTarget } from "./resize";
 
@@ -588,6 +589,10 @@ export class Island {
       case "snooze":
         Sound.play("yawn");
         this.engine.triggerEmote("yawn", 1.6);
+        break;
+      case "lap":
+        Sound.play("tick");
+        this.engine.squash();
         break;
       case "save":
         Sound.play("blip");
@@ -1202,6 +1207,7 @@ export class Island {
     // and the grid ("● 28%  ▮ 84%  14:32").
     // The countdown ticks once a second while it can be seen, never while hidden.
     Timer.setTicking(State.mode !== "hidden");
+    Stopwatch.setTicking(State.mode !== "hidden");
     const shown = this.status.sync(State.usesClaudeCode);
     this.planCompact.style.opacity = State.mode === "compact" && shown ? "1" : "0";
     // Music in the middle: the cluster slides over to the right as one piece,

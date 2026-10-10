@@ -7,6 +7,7 @@ import { Bridge } from "../core/bridge";
 import { dominantPct, planColor } from "../core/plan";
 import { State } from "../core/state";
 import { Timer, formatTimer } from "../core/timer";
+import { Stopwatch, chronoText } from "../core/stopwatch";
 import { dot, h, svg } from "./dom";
 import { ICONS } from "./icons";
 
@@ -67,10 +68,12 @@ export interface StatusCluster {
 export function buildStatusCluster(): StatusCluster {
   const timerText = h("span");
   const timer = h("span", { class: "sc-item sc-timer" }, svg(ICONS.timer, 10), timerText);
+  const chronoText_ = h("span");
+  const chrono = h("span", { class: "sc-item sc-timer chrono" }, svg(ICONS.chrono, 10, { stroke: 2.2 }), chronoText_);
   const plan = h("span", { class: "sc-item sc-plan" });
   const battery = h("span", { class: "sc-item sc-battery" });
   const clock = h("span", { class: "sc-item sc-clock" });
-  const el = h("div", { id: "plan-compact" }, timer, plan, battery, clock);
+  const el = h("div", { id: "plan-compact" }, timer, chrono, plan, battery, clock);
   let planKey = "";
   let batteryKey = "";
 
@@ -84,6 +87,13 @@ export function buildStatusCluster(): StatusCluster {
       if (Timer.active) {
         timerText.textContent = formatTimer(Timer.remaining());
         timer.className = `sc-item sc-timer ${Timer.phase}`;
+      }
+
+      // The stopwatch, running or paused, right after.
+      chrono.style.display = Stopwatch.active ? "" : "none";
+      if (Stopwatch.active) {
+        chronoText_.textContent = chronoText(Stopwatch.elapsed()).replace(/\.\d+$/, "");
+        chrono.className = `sc-item sc-timer chrono ${Stopwatch.phase}`;
       }
 
       const pct = withPlan ? dominantPct(State.planUsage) : null;
@@ -112,7 +122,7 @@ export function buildStatusCluster(): StatusCluster {
       clock.style.display = extras ? "" : "none";
       if (extras) clock.textContent = clockText();
 
-      return Timer.active || pct != null || b != null || extras;
+      return Timer.active || Stopwatch.active || pct != null || b != null || extras;
     },
   };
 }

@@ -8,8 +8,13 @@ import { colorForProject } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State, type ChatMessage, type ChatProject, type ChatSession } from "../core/state";
 import type { ViewActions, ViewHost } from "./views";
+import { extendGallery, gallery, splitImages, splitStreaming } from "./chatImages";
 
 let nextId = 1;
+
+/** Where a picture opens large (the chat card), and what to do as one loads. */
+let imageHost: () => HTMLElement | null = () => null;
+let imageLoaded: () => void = () => {};
 
 const TITLE_MAX = 60;
 
@@ -21,8 +26,18 @@ function bubble(message: ChatMessage): HTMLElement {
       h("div", { class: "bubble", text: message.content }),
     );
   }
-  const cls = message.role === "error" ? "reply err" : "reply";
-  return h("div", { class: "chat-row" }, h("div", { class: cls, text: message.content }));
+  if (message.role === "error") {
+    return h("div", { class: "chat-row" }, h("div", { class: "reply err", text: message.content }));
+  }
+  // Mochi's words, and its pictures in a row underneath.
+  const { text, images } = splitImages(message.content);
+  const row = h("div", { class: "chat-row" });
+  if (text.trim()) row.append(h("div", { class: "reply", text: text.trim() }));
+  if (images.length) {
+    row.classList.add("has-images");
+    row.append(gallery(images, imageHost, imageLoaded));
+  }
+  return row;
 }
 
 // ── The answer being written ─────────────────────────────────────────────────
@@ -41,6 +56,9 @@ const FINISH_MAX_MS = 4000;
 class LiveReply {
   readonly el: HTMLElement;
   private body: HTMLElement;
+  /** What has arrived, Markdown pictures included; `target` is what shows of it. */
+  private raw = "";
+  private pictures: HTMLElement | null = null;
   private target = "";
   private shown = 0;
   private raf = 0;
@@ -56,7 +74,7 @@ class LiveReply {
   }
 
   get active(): boolean {
-    return this.target.length > 0;
+    return this.target.length > 0 || this.pictures != null;
   }
 
   /** Called by the log after it has scrolled, to keep following the text. */
@@ -65,8 +83,20 @@ class LiveReply {
   append(text: string) {
     if (this.final) return;
     const was = this.active;
-    // Leading blank lines would show as an empty bubble.
-    this.target = this.target ? this.target + text : text.trimStart();
+    this.raw += text;
+    // Picture links leave the text (a half-written one waits out of sight);
+    // leading blank lines would show as an empty bubble.
+    const { text: words, images } = splitStreaming(this.raw);
+    this.target = words.trimStart();
+    if (images.length) {
+      if (!this.pictures) {
+        this.pictures = gallery([], imageHost, imageLoaded);
+        this.el.classList.add("has-images");
+        this.el.append(this.pictures);
+      }
+      extendGallery(this.pictures, images, imageHost, imageLoaded);
+      this.follow();
+    }
     if (this.active !== was) this.onPresence();
     this.run();
   }
@@ -75,9 +105,13 @@ class LiveReply {
     const was = this.active;
     cancelAnimationFrame(this.raf);
     this.raf = 0;
+    this.raw = "";
     this.target = "";
     this.shown = 0;
     this.final = false;
+    this.pictures?.remove();
+    this.pictures = null;
+    this.el.classList.remove("has-images");
     this.done?.();
     this.done = null;
     clear(this.body);
@@ -86,11 +120,14 @@ class LiveReply {
 
   /** The whole answer is known: show the rest of it, resolve once it is on screen. */
   finish(text: string): Promise<void> {
+    // The answer's words, without its pictures (they are already underneath).
+    text = splitImages(text).text.trim();
     const sofar = this.target.slice(0, Math.floor(this.shown));
-    if (!text.startsWith(sofar)) {
+    if (!text.startsWith(sofar.trimEnd())) {
       clear(this.body);
       this.shown = 0;
     }
+    this.shown = Math.min(this.shown, text.length);
     const was = this.active;
     this.target = text;
     this.final = true;
@@ -297,6 +334,10 @@ export function buildPrompt(actions: ViewActions, onHeightChange: () => void): V
     if (stickToBottom) log.scrollTop = log.scrollHeight;
   };
   live.onPresence = () => State.notify();
+  // A picture opens large over the chat card; as each one arrives, the log
+  // keeps following the bottom.
+  imageHost = () => el.querySelector<HTMLElement>(".chat-card");
+  imageLoaded = () => live.follow();
   let sendMode: "send" | "stop" = "send";
 
   async function startNew() {

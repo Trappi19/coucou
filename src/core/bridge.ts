@@ -91,6 +91,8 @@ export const Bridge = {
     callOrThrow<{ text: string; sessionId?: string }>("chat_send", { query, context }),
   /** New conversation (same project). */
   chatReset: () => call<void>("chat_reset"),
+  /** A picture from an answer, downloaded by Rust (https, real image files only). */
+  chatImage: (url: string) => callOrThrow<ArrayBuffer>("chat_image", { url }),
   /** Stops the Claude Code turn in flight; chatSend then fails with "Stopped.". */
   chatCancel: () => call<void>("chat_cancel"),
   /** Discussion first, then every folder Claude Code has been used in. */

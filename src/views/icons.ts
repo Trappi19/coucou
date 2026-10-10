@@ -75,4 +75,8 @@ export const ICONS = {
   tag: "M3.9 12.4V5a1.1 1.1 0 0 1 1.1-1.1h7.4l7.7 7.7a1.4 1.4 0 0 1 0 2l-6.4 6.4a1.4 1.4 0 0 1-2 0L3.9 12.4zM8.3 8.3h.01",
   // magnifyingglass
   search: "M10.6 4.6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM15.1 15.1l4.4 4.4",
+  // stopwatch — stroke icons, svg(…, { stroke })
+  chrono: "M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9.2V13l2.6 1.6M9.8 2.6h4.4M12 2.6V5M18.4 5.6l1.5 1.5",
+  // flag (a lap)
+  flag: "M5.5 21V3.8M5.5 4.2h11.2l-2.3 4.3 2.3 4.3H5.5",
 } as const;

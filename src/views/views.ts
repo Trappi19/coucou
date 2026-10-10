@@ -15,6 +15,8 @@ import { buildPlanPill, buildUsage } from "./usage";
 import { buildMusic } from "./music";
 import { buildTimer } from "./timer";
 import { buildReminders } from "./reminders";
+import { buildStopwatch } from "./stopwatch";
+import { Stopwatch, chronoText } from "../core/stopwatch";
 import { Timer, formatTimer } from "../core/timer";
 import { buildHeaderStatus } from "./status";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
@@ -45,10 +47,11 @@ export interface ViewActions {
 }
 
 /**
- * start: a timer starts · add: a reminder is added · done: an alarm answered,
- * a reminder done · snooze: put off for later · save: an edit kept.
+ * start: a timer or the stopwatch starts · add: a reminder is added · done: an
+ * alarm answered, a reminder done · snooze: put off for later · save: an edit
+ * kept · lap: a lap marked on the stopwatch.
  */
-export type Reaction = "start" | "add" | "done" | "snooze" | "save";
+export type Reaction = "start" | "add" | "done" | "snooze" | "save" | "lap";
 
 export interface ViewHost {
   el: HTMLElement;
@@ -116,7 +119,15 @@ export function buildHeader(actions: ViewActions): ViewHost {
   const tabMusic = h("button", { class: "tab", title: "Music", onclick: () => go("music") }, svg(ICONS.music, 13, { stroke: 2 }));
   // One tab for the timer and the reminders, back to whichever was used last.
   let timeView: IslandViewName = "timer";
-  const tabTimer = h("button", { class: "tab", title: "Timer & reminders", onclick: () => go(timeView) }, svg(ICONS.timer, 13));
+  const tabTimer = h("button", { class: "tab", title: "Timer, stopwatch & reminders", onclick: () => go(timeView) }, svg(ICONS.timer, 13));
+  // The stopwatch, in sight from every other view too.
+  const chronoText_ = h("span");
+  const chronoPill = h(
+    "button",
+    { class: "header-timer chrono", title: "Stopwatch", onclick: () => go("stopwatch") },
+    svg(ICONS.chrono, 11, { stroke: 2.2 }),
+    chronoText_,
+  );
   // The countdown, in sight from every other view; a click goes to the timer.
   const timerText = h("span");
   const timerPill = h(
@@ -150,7 +161,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
     "div",
     { id: "header" },
     h("div", { class: "tabs" }, tabHome, tabChat, tabHistory, tabNotes, tabTimer, tabMusic, tabDrop),
-    h("div", { class: "header-actions" }, timerPill, headerStatus.el, planPill.el, gearBtn, soundBtn, foldBtn),
+    h("div", { class: "header-actions" }, timerPill, chronoPill, headerStatus.el, planPill.el, gearBtn, soundBtn, foldBtn),
   );
 
   return {
@@ -164,9 +175,19 @@ export function buildHeader(actions: ViewActions): ViewHost {
       tabHistory.classList.toggle("on", v === "sessions");
       tabHistory.style.display = State.usesClaudeCode ? "" : "none";
       tabNotes.classList.toggle("on", v === "notes");
-      if (v === "timer" || v === "reminders") timeView = v;
-      tabTimer.classList.toggle("on", v === "timer" || v === "reminders");
-      tabTimer.classList.toggle("live", Timer.phase === "running" || Timer.phase === "ringing");
+      const timeTab = v === "timer" || v === "stopwatch" || v === "reminders";
+      if (timeTab) timeView = v;
+      tabTimer.classList.toggle("on", timeTab);
+      tabTimer.classList.toggle(
+        "live",
+        Timer.phase === "running" || Timer.phase === "ringing" || Stopwatch.phase === "running",
+      );
+      const showChrono = Stopwatch.active && v !== "stopwatch" && !State.resizing;
+      chronoPill.style.display = showChrono ? "" : "none";
+      if (showChrono) {
+        chronoText_.textContent = chronoText(Stopwatch.elapsed()).replace(/\.\d+$/, "");
+        chronoPill.className = `header-timer chrono ${Stopwatch.phase}`;
+      }
       const showTimer = Timer.active && v !== "timer" && !State.resizing;
       timerPill.style.display = showTimer ? "" : "none";
       if (showTimer) {
@@ -680,6 +701,7 @@ export function buildViews(
   map.set("notes", buildNotes(actions));
   map.set("timer", buildTimer(actions));
   map.set("reminders", buildReminders(actions));
+  map.set("stopwatch", buildStopwatch(actions, onChatHeightChange));
   map.set("upload", buildUpload());
   map.set("uploading", buildUploading());
   map.set("choose", buildChoose(actions));
