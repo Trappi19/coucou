@@ -114,6 +114,43 @@ export function rollIn(el: HTMLElement): void {
   );
 }
 
+/**
+ * Fades `el` out, calls `swap` to change what it says, and fades it back in
+ * (a new track). A swap asked for mid-fade replaces the pending one. Lands
+ * even if frames stop coming.
+ */
+export function fadeSwap(el: HTMLElement, swap: () => void): void {
+  for (const a of el.getAnimations()) a.cancel();
+  const pending = (el as { _fadeSwap?: number })._fadeSwap;
+  if (pending != null) window.clearTimeout(pending);
+  const out = el.animate(
+    [
+      { opacity: 1, transform: "none", filter: "blur(0)" },
+      { opacity: 0, transform: "translateY(-4px)", filter: "blur(2px)" },
+    ],
+    { duration: 180, easing: "ease-in", fill: "forwards" },
+  );
+  let landed = false;
+  const land = () => {
+    if (landed) return;
+    landed = true;
+    window.clearTimeout(timer);
+    delete (el as { _fadeSwap?: number })._fadeSwap;
+    swap();
+    out.cancel();
+    el.animate(
+      [
+        { opacity: 0, transform: "translateY(5px)", filter: "blur(2px)" },
+        { opacity: 1, transform: "none", filter: "blur(0)" },
+      ],
+      { duration: 340, easing: SPRING },
+    );
+  };
+  out.onfinish = land;
+  const timer = window.setTimeout(land, 260);
+  (el as { _fadeSwap?: number })._fadeSwap = timer;
+}
+
 /** Restarts a CSS animation class on `el` (a flash). */
 export function flash(el: HTMLElement, cls = "flash"): void {
   el.classList.remove(cls);

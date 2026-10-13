@@ -313,13 +313,16 @@ body {
 }
 
 /* Compact 2×2 mini grid, to the right of the notch. */
+/* Fewer than four: they gather in the middle of the square (one alone sits at
+   its centre, a third one under the middle of the first two). */
 #mini-grid {
   position: absolute;
   width: 29px;
   height: 29px;
-  display: grid;
-  grid-template-columns: 13px 13px;
-  grid-auto-rows: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
   gap: 3px;
   pointer-events: none;
   transition: opacity 0.25s ease-in-out;
@@ -556,6 +559,16 @@ body {
   flex: 1 1 auto;
 }
 
+/* No pill chosen: no empty card, the left one gets the room. */
+.overview.no-pills > .right {
+  display: none;
+}
+
+.overview.no-pills > .left {
+  flex: 1 1 auto;
+  width: auto;
+}
+
 .card-body {
   position: relative;
   z-index: 1;
@@ -680,9 +693,42 @@ body {
   padding: 0 8px;
 }
 
+/* The buttons take the room they have: one or two fill the width, a third
+   spans under the first two, four make the 2×2 grid. */
+.pills[data-count="1"],
+.pills[data-count="2"] {
+  grid-template-columns: 1fr;
+  grid-auto-rows: 36px;
+  gap: 6px;
+  padding: 0 10px;
+}
+
+.pills[data-count="1"] {
+  grid-auto-rows: 44px;
+}
+
+.pills[data-count="3"] {
+  grid-auto-rows: 32px;
+  gap: 5px;
+}
+
+.pills[data-count="3"] > .pill:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.pills[data-count="1"] .lbl,
+.pills[data-count="2"] .lbl {
+  font-size: 11.5px;
+}
+
+.pills[data-count="1"] .pill .mini,
+.pills[data-count="2"] .pill .mini {
+  margin-left: 10px;
+}
+
 .pill {
   position: relative;
-  height: 28px;
+  height: auto;
   border-radius: 999px;
   background: var(--card-flat);
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -2484,7 +2530,7 @@ input[type="range"]::-webkit-slider-thumb {
    mini grid. Both positions follow the island as it widens, so the slide
    rides the spring. */
 #plan-compact.aside {
-  left: calc(100% - 64px);
+  left: calc(100% - var(--sc-right, 64px));
   transform: translate(-100%, -50%);
 }
 

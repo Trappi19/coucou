@@ -64,7 +64,7 @@ export interface StatusCluster {
   sync(withPlan: boolean): boolean;
 }
 
-/** For the small island: "● 62%  ▮ 84%  14:32". */
+/** For the small island: "● 62%  14:32  ▮ 84%". */
 export function buildStatusCluster(): StatusCluster {
   const timerText = h("span");
   const timer = h("span", { class: "sc-item sc-timer" }, svg(ICONS.timer, 10), timerText);
@@ -73,7 +73,7 @@ export function buildStatusCluster(): StatusCluster {
   const plan = h("span", { class: "sc-item sc-plan" });
   const battery = h("span", { class: "sc-item sc-battery" });
   const clock = h("span", { class: "sc-item sc-clock" });
-  const el = h("div", { id: "plan-compact" }, timer, chrono, plan, battery, clock);
+  const el = h("div", { id: "plan-compact" }, timer, chrono, plan, clock, battery);
   let planKey = "";
   let batteryKey = "";
 

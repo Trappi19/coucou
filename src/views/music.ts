@@ -13,6 +13,7 @@ import {
 import { State } from "../core/state";
 import { clear, dot, h, svg } from "./dom";
 import { ICONS } from "./icons";
+import { fadeSwap } from "./motion";
 import type { ViewHost } from "./views";
 
 /**
@@ -85,16 +86,25 @@ export function buildMusicCompact(): MusicCompact {
   const title = h("span", { class: "mw-title" });
   const sub = h("span", { class: "mw-sub" });
   const time = h("span", { class: "mw-time" });
-  const el = h("div", { id: "music-compact" }, wave, h("div", { class: "mw-text" }, title, h("div", { class: "mw-line" }, sub, time)));
+  const text = h("div", { class: "mw-text" }, title, h("div", { class: "mw-line" }, sub, time));
+  const el = h("div", { id: "music-compact" }, wave, text);
   const fill = h("i");
   const progress = h("div", { id: "music-progress" }, fill);
   let key = "";
+  let track = "";
+  /** The old track is fading out: its time stays put until the new one comes in. */
+  let fading = false;
+
+  function write(m: MediaInfo) {
+    title.textContent = m.title;
+    sub.textContent = m.artist || playerName(m.appId);
+  }
 
   function tick() {
     const m = State.media;
     if (!m) return;
     const pos = positionNow(m);
-    time.textContent = m.durationMs > 0 ? formatTime(pos) : "";
+    if (!fading) time.textContent = m.durationMs > 0 ? formatTime(pos) : "";
     fill.style.width = m.durationMs > 0 ? `${(pos / m.durationMs) * 100}%` : "0%";
   }
   const clock = playClock(tick);
@@ -109,11 +119,26 @@ export function buildMusicCompact(): MusicCompact {
       progress.classList.toggle("on", on && (m?.durationMs ?? 0) > 0);
       clock(on && m?.playing === true);
       if (!m) return;
-      const next = `${m.appId}|${m.title}|${m.artist}|${m.playing}`;
+      // Another track (next, previous, a new video): the words fade over to it.
+      // Not on the first one, nor while the widget isn't on screen.
+      const nextTrack = `${m.appId}|${m.title}|${m.artist}`;
+      if (nextTrack !== track) {
+        const animate = track !== "" && on;
+        track = nextTrack;
+        if (animate) {
+          fading = true;
+          fadeSwap(text, () => {
+            fading = false;
+            write(State.media ?? m);
+            tick();
+          });
+        } else {
+          write(m);
+        }
+      }
+      const next = `${m.appId}|${m.playing}`;
       if (next !== key) {
         key = next;
-        title.textContent = m.title;
-        sub.textContent = m.artist || playerName(m.appId);
         el.classList.toggle("playing", m.playing);
         const color = playerColor(m.appId);
         el.style.setProperty("--mw", color);

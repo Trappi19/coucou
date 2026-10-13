@@ -339,16 +339,21 @@ function buildOverview(actions: ViewActions): ViewHost {
       if (pillKey !== pillIds) {
         pillIds = pillKey;
         clear(pills);
-        for (const t of others) pills.append(buildPill(t, actions));
+        // Bigger buttons when there are fewer of them (style.css), and no empty
+        // card at all when there are none: the left card takes the whole width.
+        pills.dataset.count = String(others.length);
+        el.classList.toggle("no-pills", others.length === 0);
+        const size = others.length <= 2 ? 28 : 24;
+        for (const t of others) pills.append(buildPill(t, actions, size));
         pruneMiniBots();
       }
     },
   };
 }
 
-function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
+function buildPill(task: AgentTask, actions: ViewActions, botSize = 24): HTMLElement {
   const label = task.id === "integration_claude" ? "VS Code" : task.name;
-  const canvas = createMiniBot(task, 24);
+  const canvas = createMiniBot(task, botSize);
   const pill = h(
     "div",
     { class: "pill", onclick: () => actions.setFocus(task.id) },

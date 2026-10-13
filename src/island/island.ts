@@ -1212,9 +1212,14 @@ export class Island {
     this.planCompact.style.opacity = State.mode === "compact" && shown ? "1" : "0";
     // Music in the middle: the cluster slides over to the right as one piece,
     // and the music takes the room it leaves.
+    // No pill in the grid: its corner is free, so the cluster settles right
+    // against the edge, music or not.
     const music = musicShown();
-    this.planCompact.classList.toggle("aside", music);
-    this.musicCompact.el.style.right = `${66 + (shown ? this.planCompact.offsetWidth + 10 : 0)}px`;
+    const noGrid = State.otherTasks.length === 0;
+    const rightRoom = noGrid ? 26 : 64;
+    this.planCompact.style.setProperty("--sc-right", `${rightRoom}px`);
+    this.planCompact.classList.toggle("aside", music || noGrid);
+    this.musicCompact.el.style.right = `${rightRoom + 2 + (shown ? this.planCompact.offsetWidth + 10 : 0)}px`;
     this.musicCompact.sync();
     if (music !== this.musicWasShown) {
       this.musicWasShown = music;
