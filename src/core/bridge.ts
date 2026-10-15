@@ -134,6 +134,8 @@ export const Bridge = {
   /** The music tab: play/pause ("toggle"), "next", "previous", or "seek" to positionMs. */
   mediaControl: (action: "toggle" | "next" | "previous" | "seek", positionMs?: number) =>
     callOrThrow<void>("media_control", { action, positionMs: positionMs ?? null }),
+  /** How loud the player is right now, 0..1 (the small island's equalizer). */
+  audioLevel: (appId: string) => call<number>("audio_level", { appId }),
   /** Each global shortcut, its keys and whether Windows accepted them. */
   shortcutsStatus: () => call<ShortcutStatus[]>("shortcuts_status"),
   /** The GitHub card came up: fetch that section again if it is stale. */

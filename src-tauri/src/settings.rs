@@ -53,9 +53,16 @@ pub struct Settings {
     /// What's playing shows in the small island, with a music tab.
     #[serde(default = "default_true")]
     pub music_widget: bool,
-    /// The time, and the battery on a laptop, next to the plan.
+    /// The time, and the battery on a laptop, in the open island's header.
     #[serde(default = "default_true")]
     pub clock_battery: bool,
+    /// What the small island shows on its right: the Claude plan, the time, the battery.
+    #[serde(default = "default_true")]
+    pub compact_plan: bool,
+    #[serde(default = "default_true")]
+    pub compact_clock: bool,
+    #[serde(default = "default_true")]
+    pub compact_battery: bool,
 }
 
 fn default_true() -> bool {
@@ -111,6 +118,9 @@ impl Default for Settings {
             plan_refresh_minutes: default_plan_refresh(),
             music_widget: true,
             clock_battery: true,
+            compact_plan: true,
+            compact_clock: true,
+            compact_battery: true,
         }
     }
 }

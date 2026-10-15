@@ -64,7 +64,7 @@ export interface StatusCluster {
   sync(withPlan: boolean): boolean;
 }
 
-/** For the small island: "● 62%  14:32  ▮ 84%". */
+/** For the small island: "● 62%  14:32  ▮ 84%", each piece switched in Settings. */
 export function buildStatusCluster(): StatusCluster {
   const timerText = h("span");
   const timer = h("span", { class: "sc-item sc-timer" }, svg(ICONS.timer, 10), timerText);
@@ -80,7 +80,7 @@ export function buildStatusCluster(): StatusCluster {
   return {
     el,
     sync(withPlan) {
-      const extras = State.settings.clockBattery;
+      const s = State.settings;
 
       // A timer, running, paused or ringing, comes first.
       timer.style.display = Timer.active ? "" : "none";
@@ -96,7 +96,7 @@ export function buildStatusCluster(): StatusCluster {
         chrono.className = `sc-item sc-timer chrono ${Stopwatch.phase}`;
       }
 
-      const pct = withPlan ? dominantPct(State.planUsage) : null;
+      const pct = withPlan && s.compactPlan ? dominantPct(State.planUsage) : null;
       plan.style.display = pct != null ? "" : "none";
       if (pct != null) {
         const label = `${Math.round(pct)}%`;
@@ -108,7 +108,7 @@ export function buildStatusCluster(): StatusCluster {
         }
       }
 
-      const b = extras ? State.battery : null;
+      const b = s.compactBattery ? State.battery : null;
       battery.style.display = b ? "" : "none";
       if (b) {
         const key = `${b.percent}|${b.charging}`;
@@ -119,10 +119,10 @@ export function buildStatusCluster(): StatusCluster {
         }
       }
 
-      clock.style.display = extras ? "" : "none";
-      if (extras) clock.textContent = clockText();
+      clock.style.display = s.compactClock ? "" : "none";
+      if (s.compactClock) clock.textContent = clockText();
 
-      return Timer.active || Stopwatch.active || pct != null || b != null || extras;
+      return Timer.active || Stopwatch.active || pct != null || b != null || s.compactClock;
     },
   };
 }

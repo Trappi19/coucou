@@ -4,8 +4,10 @@
 
 use std::path::PathBuf;
 
+mod audio;
 mod media;
 mod windows;
+pub use self::audio::*;
 pub use self::media::*;
 pub use self::windows::*;
 

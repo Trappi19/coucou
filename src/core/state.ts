@@ -133,8 +133,12 @@ export interface Settings {
   planRefreshMinutes: number;
   /** What's playing shows in the small island (and the music tab is there). */
   musicWidget: boolean;
-  /** The time, and the battery on a laptop, next to the plan. */
+  /** The time, and the battery on a laptop, in the open island's header. */
   clockBattery: boolean;
+  /** What the small island shows on its right: the Claude plan, the time, the battery. */
+  compactPlan: boolean;
+  compactClock: boolean;
+  compactBattery: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -161,6 +165,9 @@ export const DEFAULT_SETTINGS: Settings = {
   planRefreshMinutes: 5,
   musicWidget: true,
   clockBattery: true,
+  compactPlan: true,
+  compactClock: true,
+  compactBattery: true,
 };
 
 type Listener = () => void;

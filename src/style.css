@@ -3085,12 +3085,106 @@ input[type="range"]::-webkit-slider-thumb {
   transition: opacity 0.4s ease-out 0.18s, transform 0.5s cubic-bezier(0.22, 0.9, 0.32, 1) 0.18s;
 }
 
+/* The cover and the words: as wide as the title needs, up to a point; the
+   equalizer takes what's left. */
+.mw-now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: 190px;
+}
+
+.mw-cover {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  display: grid;
+  place-items: center;
+  color: var(--mw, #a78bfa);
+}
+
+.mw-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .mw-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
   flex: 1 1 auto;
   line-height: 1.15;
+}
+
+/* Bars pulsing out from the middle (music.ts draws them). */
+.mw-eq {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 18px;
+  display: block;
+}
+
+/* ⏮ ⏯ ⏭ where the status cluster was, while the cursor is on the island. */
+#music-controls {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.92);
+  transition: opacity 0.18s ease-in, transform 0.25s ease-in;
+}
+
+#music-controls.on {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  transition: opacity 0.22s ease-out 0.05s, transform 0.35s cubic-bezier(0.3, 1.25, 0.4, 1) 0.05s;
+}
+
+.mc-btn {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #c5c8cd;
+  display: grid;
+  place-items: center;
+  cursor: default;
+  transition: background 0.15s, color 0.15s, transform 0.2s cubic-bezier(0.3, 1.25, 0.4, 1);
+}
+
+.mc-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.mc-btn:active {
+  transform: scale(0.92);
+}
+
+.mc-btn.mc-play {
+  background: var(--mw, #a78bfa);
+  color: #0b0b0c;
+}
+
+.mc-btn.mc-play:hover {
+  background: var(--mw, #a78bfa);
+  color: #000;
+  filter: brightness(1.12);
 }
 
 .mw-title {

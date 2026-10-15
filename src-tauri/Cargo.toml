@@ -31,6 +31,12 @@ windows = { version = "0.61", features = [
   "Media_Control",
   "Storage_Streams",
   "Win32_System_WinRT",
+  # How loud the player is, for the small island's equalizer (Core Audio peak meters).
+  "Win32_Media_Audio",
+  "Win32_Media_Audio_Endpoints",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
   # Laptop battery, next to the plan in the small island.
   "Win32_System_Power",
   "Win32_Foundation",

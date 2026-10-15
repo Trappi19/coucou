@@ -40,6 +40,7 @@ export class IslandStateMachine {
   private homeCollapse: number | null = null;
   private greetCollapse: number | null = null;
   private hoverOpen: number | null = null;
+  private hoverHeld = false;
 
   // ── Inputs ──────────────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ export class IslandStateMachine {
         this.transition("petit");
         break;
       case "petit":
-        if (this.openOnHover) this.scheduleHoverOpen();
+        if (this.openOnHover && !this.hoverHeld) this.scheduleHoverOpen();
         break;
       case "home":
         this.clear("homeCollapse");
@@ -88,6 +89,19 @@ export class IslandStateMachine {
         this.transition("petit");
         break;
     }
+  }
+
+  /**
+   * The cursor rests on something to click in compact (the music controls): it
+   * doesn't open by hovering meanwhile, and starts counting again once it moves
+   * off them, still over the island.
+   */
+  holdHover(hold: boolean, inIsland: boolean) {
+    if (hold === this.hoverHeld) return;
+    this.hoverHeld = hold;
+    if (this.frozen || this.state !== "petit") return;
+    if (hold) this.clear("hoverOpen");
+    else if (inIsland && this.openOnHover) this.scheduleHoverOpen();
   }
 
   /** The island opened while the mouse was elsewhere (an alert): leave time to read it. */

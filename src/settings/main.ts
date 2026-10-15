@@ -602,6 +602,15 @@ function generalSection(): HTMLElement {
     h("option", { value: "cursor", text: "Display under the cursor" }),
   );
   screen.value = settings.screen;
+
+  // Only a laptop has a battery to show: the switch stays out of sight on a desktop.
+  const compactBatteryRow = h("div", { class: "row", style: "display:none" },
+    h("label", { text: "Small: battery" }),
+    toggle(settings.compactBattery ?? true, (v) => { settings.compactBattery = v; void save(); }),
+  );
+  void Bridge.batteryStatus().then((b) => {
+    if (b) compactBatteryRow.style.display = "";
+  });
   screen.addEventListener("change", () => {
     settings.screen = screen.value as Settings["screen"];
     void save();
@@ -632,9 +641,19 @@ function generalSection(): HTMLElement {
       h("span", { class: "hint", text: "an open conversation folds too; otherwise it stays until ⌃ or Esc" }),
     ),
     h("div", { class: "row" },
-      h("label", { text: "Time & battery" }),
+      h("label", { text: "Small: Claude usage" }),
+      toggle(settings.compactPlan ?? true, (v) => { settings.compactPlan = v; void save(); }),
+      h("span", { class: "hint", text: "the plan's % on the right of the small island" }),
+    ),
+    h("div", { class: "row" },
+      h("label", { text: "Small: time" }),
+      toggle(settings.compactClock ?? true, (v) => { settings.compactClock = v; void save(); }),
+    ),
+    compactBatteryRow,
+    h("div", { class: "row" },
+      h("label", { text: "Open: time & battery" }),
       toggle(settings.clockBattery ?? true, (v) => { settings.clockBattery = v; void save(); }),
-      h("span", { class: "hint", text: "next to the Claude plan; the battery only on a laptop" }),
+      h("span", { class: "hint", text: "in the open island's header, before the Claude pill" }),
     ),
     h("div", { class: "row" },
       h("label", { text: "Music widget" }),

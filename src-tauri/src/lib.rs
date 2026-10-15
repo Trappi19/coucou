@@ -435,6 +435,12 @@ async fn media_control(action: String, position_ms: Option<u64>) -> Result<(), S
     media::control(action, position_ms).await
 }
 
+/// The small island's equalizer: how loud the player is right now, 0..1.
+#[tauri::command]
+fn audio_level(app_id: String) -> f32 {
+    media::level(app_id)
+}
+
 /// Settings → Shortcuts: each action, its keys and whether Windows took them.
 #[tauri::command]
 fn shortcuts_status(app: AppHandle) -> Vec<shortcuts::ActionStatus> {
@@ -659,6 +665,7 @@ pub fn run() {
             github_refresh,
             shortcuts_status,
             media_control,
+            audio_level,
             battery_status,
             open_n8n,
             open_settings_window,

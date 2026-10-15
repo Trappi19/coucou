@@ -3,7 +3,9 @@
 // changes. The island moves the time along itself between two reports, so one
 // look a second is plenty, and nothing is sent while nothing changes.
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -55,6 +57,7 @@ fn cover() -> Option<String> {
 }
 
 pub fn start(app: AppHandle) {
+    start_meter();
     std::thread::spawn(move || {
         platform::join_apartment();
         let mut last: Option<(NowPlaying, u64)> = None;
@@ -65,7 +68,7 @@ pub fn start(app: AppHandle) {
                 .try_state::<crate::Shared>()
                 .map(|s| s.settings.lock().unwrap().music_widget)
                 .unwrap_or(true);
-            if !enabled || crate::integrations::PAUSED.load(std::sync::atomic::Ordering::Relaxed) {
+            if !enabled || crate::integrations::PAUSED.load(Ordering::Relaxed) {
                 if last.take().is_some() {
                     let _ = app.emit_to(WINDOW_LABEL, "media", Option::<MediaUpdate>::None);
                 }
@@ -101,6 +104,64 @@ pub fn start(app: AppHandle) {
             }
         }
     });
+}
+
+// ── Level, for the equalizer ──────────────────────────────────────────────────
+//
+// The island asks for the level ~30 times a second while its equalizer is on
+// screen. A thread reads the peak meter at that pace and keeps the last value;
+// when nobody has asked for a moment it lets go of the meter and sleeps, so a
+// folded island or a paused track costs nothing.
+
+static LEVEL: AtomicU32 = AtomicU32::new(0);
+static ASKED_AT: AtomicU64 = AtomicU64::new(0);
+static LEVEL_APP: Mutex<String> = Mutex::new(String::new());
+static METER_THREAD: OnceLock<std::thread::Thread> = OnceLock::new();
+
+const LEVEL_EVERY: Duration = Duration::from_millis(33);
+/// Nobody asked for this long: the meter thread goes to sleep.
+const LEVEL_IDLE_AFTER_MS: u64 = 1500;
+/// Sessions come and go (another tab, headphones plugged in): look again this often.
+const METER_REFRESH: Duration = Duration::from_secs(3);
+
+/// The last level of `app_id`'s audio, 0..1 (wakes the meter thread if needed).
+pub fn level(app_id: String) -> f32 {
+    ASKED_AT.store(now_ms(), Ordering::Relaxed);
+    *LEVEL_APP.lock().unwrap() = app_id;
+    if let Some(t) = METER_THREAD.get() {
+        t.unpark();
+    }
+    f32::from_bits(LEVEL.load(Ordering::Relaxed))
+}
+
+fn start_meter() {
+    let handle = std::thread::spawn(|| {
+        platform::join_apartment();
+        let mut meter: Option<(platform::AudioMeter, String, Instant)> = None;
+        loop {
+            if now_ms().saturating_sub(ASKED_AT.load(Ordering::Relaxed)) > LEVEL_IDLE_AFTER_MS {
+                meter = None;
+                LEVEL.store(0f32.to_bits(), Ordering::Relaxed);
+                std::thread::park();
+                continue;
+            }
+            let app = LEVEL_APP.lock().unwrap().clone();
+            let stale = meter.as_ref().map_or(true, |(_, a, at)| *a != app || at.elapsed() > METER_REFRESH);
+            if stale {
+                meter = platform::audio_meter(&app).map(|m| (m, app, Instant::now()));
+                if meter.is_none() {
+                    std::thread::sleep(Duration::from_secs(1));
+                    continue;
+                }
+            }
+            match meter.as_ref().and_then(|(m, _, _)| m.peak()) {
+                Some(v) => LEVEL.store(v.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed),
+                None => meter = None,
+            }
+            std::thread::sleep(LEVEL_EVERY);
+        }
+    });
+    let _ = METER_THREAD.set(handle.thread().clone());
 }
 
 /// The music tab's buttons. Blocking WinRT calls: run off the main thread.

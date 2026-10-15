@@ -61,6 +61,8 @@ export class Island {
   private planCompact!: HTMLElement;
   /** What's playing, in compact (views/music.ts). */
   private musicCompact!: MusicCompact;
+  /** The status cluster has something to show (see syncMusicHover). */
+  private statusShown = false;
   private musicWasShown = false;
   /** A new version was found while the island was busy: offered when it folds. */
   private updateWaiting = false;
@@ -276,6 +278,7 @@ export class Island {
       this.planCompact,
       this.musicCompact.el,
       this.musicCompact.progress,
+      this.musicCompact.controls,
       this.countdown,
       ...this.resize.handles,
     );
@@ -910,6 +913,7 @@ export class Island {
       }
     }
     this.wasInIsland = inIsland;
+    this.syncMusicHover();
 
     // Bot hover → love
     const overBot = State.mode === "expanded" && State.stateOverride == null && this.isBotHit(x, y);
@@ -1209,7 +1213,7 @@ export class Island {
     Timer.setTicking(State.mode !== "hidden");
     Stopwatch.setTicking(State.mode !== "hidden");
     const shown = this.status.sync(State.usesClaudeCode);
-    this.planCompact.style.opacity = State.mode === "compact" && shown ? "1" : "0";
+    this.statusShown = shown;
     // Music in the middle: the cluster slides over to the right as one piece,
     // and the music takes the room it leaves.
     // No pill in the grid: its corner is free, so the cluster settles right
@@ -1219,7 +1223,13 @@ export class Island {
     const rightRoom = noGrid ? 26 : 64;
     this.planCompact.style.setProperty("--sc-right", `${rightRoom}px`);
     this.planCompact.classList.toggle("aside", music || noGrid);
-    this.musicCompact.el.style.right = `${rightRoom + 2 + (shown ? this.planCompact.offsetWidth + 10 : 0)}px`;
+    // The music controls take the cluster's place under the cursor, so the
+    // music keeps room for the wider of the two.
+    const controls = this.musicCompact.controls;
+    controls.style.right = `${rightRoom}px`;
+    const side = Math.max(shown ? this.planCompact.offsetWidth : 0, controls.offsetWidth);
+    this.musicCompact.el.style.right = `${rightRoom + 2 + side + 10}px`;
+    this.syncMusicHover();
     this.musicCompact.sync();
     if (music !== this.musicWasShown) {
       this.musicWasShown = music;
@@ -1229,6 +1239,25 @@ export class Island {
     syncMiniBotStates(State.tasks);
     this.engine.setState(State.effectiveState);
     this.resize.sync();
+  }
+
+  /**
+   * Cursor on the small island while music shows: ⏮ ⏯ ⏭ fade in where the
+   * status cluster was, which fades out. Called on each cursor move and sync.
+   */
+  private syncMusicHover() {
+    const compact = State.mode === "compact";
+    const hover = compact && this.wasInIsland && musicShown();
+    const controls = this.musicCompact.controls;
+    controls.classList.toggle("on", hover);
+    this.planCompact.style.opacity = compact && this.statusShown && !hover ? "1" : "0";
+    // Over the buttons themselves, hovering doesn't open the island.
+    let over = false;
+    if (hover) {
+      const r = controls.getBoundingClientRect();
+      over = State.mouse.x >= r.left - 4 && State.mouse.x <= r.right + 4 && State.mouse.y >= r.top - 6 && State.mouse.y <= r.bottom + 6;
+    }
+    this.fsm.holdHover(over, this.wasInIsland);
   }
 
   /** Applies settings coming from Rust at boot. */
