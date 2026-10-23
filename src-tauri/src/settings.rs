@@ -63,6 +63,13 @@ pub struct Settings {
     pub compact_clock: bool,
     #[serde(default = "default_true")]
     pub compact_battery: bool,
+    /// The view the island opens on ("overview", "prompt", "notes", "timer"…).
+    #[serde(default = "default_open_view")]
+    pub open_view: String,
+}
+
+fn default_open_view() -> String {
+    "overview".into()
 }
 
 fn default_true() -> bool {
@@ -121,6 +128,7 @@ impl Default for Settings {
             compact_plan: true,
             compact_clock: true,
             compact_battery: true,
+            open_view: default_open_view(),
         }
     }
 }

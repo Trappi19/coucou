@@ -42,6 +42,18 @@ const PRE_PROGRESS = USC.T_PROG_START - USC.T_DROP;
  */
 const COMPACT_FRAME_MS = 40;
 
+/** Opened again within this long after folding, the island is back where it was. */
+const RESUME_MS = 3 * 60_000;
+
+/**
+ * Views that are moments, not places: an alert, a drop in progress, a note on
+ * screen. Folding on one of them, the island opens on its usual view next time.
+ */
+const NOT_RESUMED: ReadonlySet<IslandViewName> = new Set([
+  "greeting", "empty", "approval", "question", "error", "finished", "confused",
+  "upload", "uploading", "choose", "mail", "searching", "result", "note", "resize", "update",
+]);
+
 const modeOrder = (m: IslandMode) => (m === "hidden" ? 0 : m === "compact" ? 1 : 2);
 
 export class Island {
@@ -106,6 +118,8 @@ export class Island {
   private homeCollapseAt: number | null = null;
   /** Folded in the middle of a conversation: opening again goes straight back to it. */
   private reopenView: IslandViewName | null = null;
+  /** The view the island folded on, and when: opened again soon, it comes back there. */
+  private folded: { view: IslandViewName; at: number } | null = null;
   /** Waiting for the launch greeting to end (see whenGreeted). */
   private afterGreeting: (() => void)[] = [];
 
@@ -315,7 +329,7 @@ export class Island {
           if (this.updateWaiting) window.setTimeout(() => this.offerUpdate(), 1200);
           break;
         case "home":
-          this.expand(this.reopenView ?? State.defaultView());
+          this.expand(this.reopenView ?? this.resumeView() ?? State.defaultView());
           this.reopenView = null;
           if (!this.wasInIsland) this.fsm.openedUnattended();
           break;
@@ -495,6 +509,7 @@ export class Island {
       const midChat = State.view === "prompt" && State.chatHistory.length > 0;
       const midNote = State.view === "notes" && (shown?.engaged?.() ?? false);
       this.reopenView = midChat || midNote ? State.view : null;
+      this.folded = NOT_RESUMED.has(State.view) ? null : { view: State.view, at: Date.now() };
       shown?.hide?.();
       // Opening again shows the view afresh, keyboard focus included.
       this.lastSyncedView = null;
@@ -604,6 +619,16 @@ export class Island {
         break;
     }
     this.ensureRunning();
+  }
+
+  /** Where the island was when it folded, if that was less than RESUME_MS ago. */
+  private resumeView(): IslandViewName | null {
+    const f = this.folded;
+    if (!f || Date.now() - f.at > RESUME_MS) return null;
+    // A tab that has gone since (the music widget turned off…) isn't a place to go back to.
+    if (f.view === "music" && !State.settings.musicWidget) return null;
+    if (f.view === "sessions" && !State.usesClaudeCode) return null;
+    return f.view;
   }
 
   /** Runs `fn` once the launch greeting is over — right away when it isn't on. */

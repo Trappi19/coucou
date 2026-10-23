@@ -232,7 +232,9 @@ function buildOverview(actions: ViewActions): ViewHost {
     h("div", { class: "right" }, right),
   );
 
-  let pillIds = "";
+  // null, not "": with no pill at all the key stays "", and the layout without
+  // the right card must still be set the first time.
+  let pillIds: string | null = null;
   let detailOpen = false;
   let lastFocus: string | null = null;
   let mode: "ticker" | "card" | null = null;

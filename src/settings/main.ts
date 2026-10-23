@@ -4,7 +4,7 @@
 
 import "./settings.css";
 import { Bridge, onEvent, type ClaudeCodeStatus, type HookStatus, type ShortcutStatus } from "../core/bridge";
-import { DEFAULT_SETTINGS, type ChatBackend, type Settings } from "../core/state";
+import { DEFAULT_SETTINGS, OPEN_VIEWS, type ChatBackend, type OpenView, type Settings } from "../core/state";
 import { h, clear } from "../views/dom";
 
 let settings: Settings = { ...DEFAULT_SETTINGS };
@@ -596,6 +596,16 @@ function generalSection(): HTMLElement {
   showSize();
   sizeListeners.push(showSize);
 
+  // Where the island opens. Back on the same view instead when it is opened
+  // again within a few minutes of folding (island.ts, RESUME_MS).
+  const openView = h("select", {}) as HTMLSelectElement;
+  for (const [id, label] of OPEN_VIEWS) openView.append(h("option", { value: id, text: label }));
+  openView.value = settings.openView ?? "overview";
+  openView.addEventListener("change", () => {
+    settings.openView = openView.value as OpenView;
+    void save();
+  });
+
   const screen = h("select", {}) as HTMLSelectElement;
   screen.append(
     h("option", { value: "primary", text: "Main display" }),
@@ -634,6 +644,11 @@ function generalSection(): HTMLElement {
       h("label", { text: "Open on hover" }),
       toggle(settings.openOnHover, (v) => { settings.openOnHover = v; void save(); }),
       h("span", { class: "hint", text: "rest the cursor on Mochi to open it, no click needed" }),
+    ),
+    h("div", { class: "row" },
+      h("label", { text: "Opens on" }),
+      openView,
+      h("span", { class: "hint", text: "the view you get when the island opens; within 3 minutes of folding it, you're back where you were" }),
     ),
     h("div", { class: "row" },
       h("label", { text: "Fold during chats" }),

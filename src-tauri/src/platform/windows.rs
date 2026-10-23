@@ -267,14 +267,17 @@ fn hwnd_of(win: &WebviewWindow) -> Option<HWND> {
 /// Lets dropped files reach the app again.
 ///
 /// wry installs its drop target by walking the webview's child windows **once**,
-/// when the webview is created. WebView2 creates `Chrome_RenderWidgetHostHWND`
-/// later and registers its own target on it; being the innermost window, that one
-/// wins, and since the page has no HTML5 drop handler it refuses everything — the
-/// "no drop" cursor, with nothing reaching Tauri. Revoking it makes OLE fall
-/// through to the target wry registered on the parent widget, which is the one
-/// that feeds Tauri's drag events.
+/// when the webview is created (it lands on `Chrome_WidgetWin_0`). WebView2
+/// creates its inner windows later and registers its own targets on them — on
+/// `Chrome_RenderWidgetHostHWND` and, in recent runtimes (seen with 155), on
+/// `Chrome_WidgetWin_1` as well. The innermost target wins, and since the page
+/// has no HTML5 drop handler it refuses everything: the "no drop" cursor, with
+/// nothing reaching Tauri. Revoking them makes OLE fall through to wry's target
+/// on `Chrome_WidgetWin_0`, which is the one that feeds Tauri's drag events.
 ///
-/// Cheap and idempotent, so it is simply re-run whenever a drag might be starting.
+/// WebView2 may put its targets back (when the page takes the keyboard, for
+/// one), so this is cheap, idempotent, and re-run whenever a drag might be
+/// starting or the window has just changed.
 pub fn unblock_webview_drops(app: &AppHandle) {
     for label in [WINDOW_LABEL, "settings"] {
         let Some(win) = app.get_webview_window(label) else { continue };
@@ -290,7 +293,7 @@ unsafe extern "system" fn revoke_render_widget(hwnd: HWND, _: LPARAM) -> BOOL {
     let len = unsafe { GetClassNameW(hwnd, &mut name) };
     if len > 0 {
         let class = String::from_utf16_lossy(&name[..len as usize]);
-        if class == "Chrome_RenderWidgetHostHWND" {
+        if class == "Chrome_RenderWidgetHostHWND" || class == "Chrome_WidgetWin_1" {
             let _ = unsafe { RevokeDragDrop(hwnd) };
         }
     }

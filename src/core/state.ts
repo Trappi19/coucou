@@ -139,7 +139,23 @@ export interface Settings {
   compactPlan: boolean;
   compactClock: boolean;
   compactBattery: boolean;
+  /** The view the island opens on. */
+  openView: OpenView;
 }
+
+/** Views the island can open on, in the order the settings list them. */
+export const OPEN_VIEWS = [
+  ["overview", "Overview"],
+  ["prompt", "Ask (chat)"],
+  ["sessions", "Conversations"],
+  ["notes", "Notes"],
+  ["timer", "Timer"],
+  ["stopwatch", "Stopwatch"],
+  ["reminders", "Reminders"],
+  ["music", "Music"],
+] as const;
+
+export type OpenView = (typeof OPEN_VIEWS)[number][0];
 
 export const DEFAULT_SETTINGS: Settings = {
   soundEnabled: true,
@@ -168,6 +184,7 @@ export const DEFAULT_SETTINGS: Settings = {
   compactPlan: true,
   compactClock: true,
   compactBattery: true,
+  openView: "overview",
 };
 
 type Listener = () => void;
@@ -378,7 +395,19 @@ class AppState {
     this.promptContext = null;
   }
 
+  /**
+   * Where the island opens: the view chosen in the settings, when it can be
+   * shown (the music tab needs the widget, conversations need Claude Code);
+   * otherwise the overview.
+   */
   defaultView(): IslandViewName {
+    const v = this.settings.openView;
+    const usable =
+      OPEN_VIEWS.some(([id]) => id === v) &&
+      v !== "overview" &&
+      !(v === "music" && !this.settings.musicWidget) &&
+      !(v === "sessions" && !this.usesClaudeCode);
+    if (usable) return v;
     return this.tasks.length === 0 ? "empty" : "overview";
   }
 }

@@ -112,6 +112,9 @@ fn set_collapsed(app: AppHandle, shared: State<Shared>, collapsed: bool) {
     // The wake strip must always take the mouse, and a resize invalidates the flag.
     island::refresh_click_through(&app, &shared.gate);
     shared.gate.set_active(!collapsed);
+    // Shrunk to the wake strip or grown back: a file dragged onto either must be taken.
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || platform::unblock_webview_drops(&handle));
 }
 
 /// Sizes the panel for the island scale the user picked (or the largest one
@@ -151,6 +154,9 @@ fn focus_window(app: AppHandle, focused: bool) {
     if focused {
         let _ = win.set_focus();
     }
+    // Taking the keyboard is when WebView2 tends to register its drop targets again.
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || platform::unblock_webview_drops(&handle));
 }
 
 #[tauri::command]
@@ -684,6 +690,27 @@ pub fn run() {
                 platform::make_non_activating(&win);
                 island::apply_geometry(&handle, &loaded.screen, false);
                 let _ = win.show();
+                // A file dragged over the island, as Windows reports it. If the
+                // island ever stops reacting to drops, these lines in the log
+                // tell whether the drag reaches the app at all.
+                win.on_window_event(|event| {
+                    if let tauri::WindowEvent::DragDrop(drag) = event {
+                        let what = match drag {
+                            tauri::DragDropEvent::Enter { paths, .. } => format!("enter {} file(s)", paths.len()),
+                            tauri::DragDropEvent::Drop { paths, .. } => format!("drop {} file(s)", paths.len()),
+                            tauri::DragDropEvent::Leave => "leave".to_string(),
+                            _ => return,
+                        };
+                        log::line(format!("drag {what} (window)"));
+                    }
+                });
+                // The first chance: WebView2 has built its inner windows by now.
+                let unblock = handle.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(3));
+                    let inner = unblock.clone();
+                    let _ = unblock.run_on_main_thread(move || platform::unblock_webview_drops(&inner));
+                });
             }
             gate.collapsed.store(false, Ordering::Relaxed);
             // Nothing drawn yet, so nothing takes the mouse until the page
